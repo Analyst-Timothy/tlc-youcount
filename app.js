@@ -1565,6 +1565,17 @@ async function api(action, body = {}) {
   if (!response.ok) throw new Error(data.message || "Service unavailable");
   return data;
 }
+async function ensureVisitorSession(force = false) {
+  if (!force && state.sessionToken) return state.sessionToken;
+  const result = await api("visitorStart", {
+    browserId: BROWSER_SESSION_ID,
+  });
+  if (!result.session) throw new Error("The secure photo session could not be created.");
+  state.sessionToken = result.session;
+  state.manualReview = true;
+  saveDraft();
+  return result.session;
+}
 async function surveyApi(answers) {
   const response = await fetch("/api/survey", {
     method: "POST",
@@ -2665,14 +2676,9 @@ function bind() {
           const startVisitorSession = async () => {
             state.search =
               `${changes.firstName || ""} ${changes.lastName || ""}`.trim();
-            const result = await api("start", {
-              name: state.search,
-              browserId: BROWSER_SESSION_ID,
-            });
-            if (!result.session) throw new Error("session_not_created");
-            state.sessionToken = result.session;
+            await ensureVisitorSession(true);
           };
-          if (!state.sessionToken) await startVisitorSession();
+          if (!state.sessionToken) await ensureVisitorSession();
           try {
             await api("manualRoute", { kind: "visitor" });
           } catch {
@@ -4539,12 +4545,26 @@ function bindPhotoUpload() {
     try {
       const data = await compressPhoto(file);
       status.textContent = "Uploading securely…";
-      const result = await api("photo", {
-        data,
-        name: file.name,
-        previous: state.photo?.pathname || "",
-        manual: state.manualReview,
-      });
+      if (state.journeyType === "visitor") await ensureVisitorSession();
+      const upload = () =>
+        api("photo", {
+          data,
+          name: file.name,
+          previous: state.photo?.pathname || "",
+          manual: state.manualReview,
+        });
+      let result;
+      try {
+        result = await upload();
+      } catch (error) {
+        if (
+          state.journeyType !== "visitor" ||
+          !/session has expired/i.test(error.message || "")
+        )
+          throw error;
+        await ensureVisitorSession(true);
+        result = await upload();
+      }
       state.photo = result.photo;
       state.existingPhoto = data;
       state.formDraft.photo = state.photo;

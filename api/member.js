@@ -1731,6 +1731,55 @@ module.exports = async function handler(req, res) {
       await sleep(350);
       return L.json(res, 200, { ...generic, session: raw });
     }
+    if (action === "visitorStart") {
+      const browserId = String(req.body?.browserId || "").slice(0, 100);
+      if (!/^[a-zA-Z0-9_-]{16,100}$/.test(browserId))
+        return L.json(res, 400, {
+          ok: false,
+          message: "Please refresh the page and try again.",
+        });
+      if (
+        !(await L.consumeRate(
+          db,
+          "visitor_session_browser",
+          L.hash(`visitor-browser:${browserId}`),
+          10,
+          15,
+        ))
+      )
+        return L.json(res, 429, {
+          ok: false,
+          message: "Please wait before continuing.",
+        });
+      if (!(await L.consumeRate(db, "visitor_session_network", ipHash, 2000, 15)))
+        return L.json(res, 429, {
+          ok: false,
+          message:
+            "There are unusually many visitor sessions on this network. Please wait and try again.",
+        });
+      const raw = L.token(),
+        payload = {
+          name: "",
+          people: [],
+          manualReviewAllowed: true,
+          manualReviewKind: "visitor",
+          visitor: true,
+          uploadedPhotos: [],
+        },
+        rows = await db.query(
+          "INSERT INTO verification_sessions(token_hash,ip_hash,payload,expires_at) VALUES($1,$2,$3,now()+interval '2 hours') RETURNING id",
+          [L.hash(raw), ipHash, L.encrypt(payload)],
+        );
+      await L.audit(
+        db,
+        rows[0].id,
+        ipHash,
+        "visitor_session_started",
+        null,
+        "ready",
+      );
+      return L.json(res, 200, { ok: true, session: raw });
+    }
     const s = await session(db, req.body?.session);
     if (!s)
       return L.json(res, 400, {
