@@ -1,5 +1,5 @@
 const L = require("./_lib");
-const { syncCatalogues } = require("./_catalog");
+const { syncCatalogues, syncPeople } = require("./_catalog");
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") return L.json(res, 405, { ok: false });
   if (
@@ -31,7 +31,11 @@ module.exports = async function handler(req, res) {
     if (!lock[0]?.acquired)
       return L.json(res, 200, { ok: true, job, skipped: "already_running" });
     try {
-      return L.json(res, 200, { ok: true, job, ...(await syncCatalogues(db)) });
+      const result =
+        job === "people-inactive"
+          ? await syncPeople(db, ["inactive"])
+          : await syncCatalogues(db, { peopleStatuses: ["active"] });
+      return L.json(res, 200, { ok: true, job, ...result });
     } finally {
       await db.query("SELECT pg_advisory_unlock(784512)");
     }

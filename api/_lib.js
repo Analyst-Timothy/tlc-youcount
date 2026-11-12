@@ -296,6 +296,7 @@ async function migrateDb() {
     source_updated_at timestamptz,
     sync_run_id text NOT NULL,
     key_fingerprint text NOT NULL,
+    source_status text NOT NULL DEFAULT 'active',
     active boolean NOT NULL DEFAULT true,
     synced_at timestamptz NOT NULL DEFAULT now()
   )`);
@@ -303,10 +304,16 @@ async function migrateDb() {
     `ALTER TABLE pc_people_cache ADD COLUMN IF NOT EXISTS key_fingerprint text`,
   );
   await db.query(
+    `ALTER TABLE pc_people_cache ADD COLUMN IF NOT EXISTS source_status text NOT NULL DEFAULT 'active'`,
+  );
+  await db.query(
     `CREATE INDEX IF NOT EXISTS pc_people_cache_name_hashes_idx ON pc_people_cache USING gin(name_hashes)`,
   );
   await db.query(
     `CREATE INDEX IF NOT EXISTS pc_people_cache_active_synced_idx ON pc_people_cache(active,synced_at)`,
+  );
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS pc_people_cache_status_synced_idx ON pc_people_cache(source_status,active,synced_at)`,
   );
   await db.query(`CREATE TABLE IF NOT EXISTS pc_person_group_cache (
     person_hash text NOT NULL,

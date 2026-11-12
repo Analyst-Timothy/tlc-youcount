@@ -40,6 +40,11 @@
       "schedule": "15 2 * * *",
       "path": "/api/maintenance?job=all",
       "requestMethod": "GET"
+    },
+    "youcount-inactive-profiles": {
+      "schedule": "15 3 * * *",
+      "path": "/api/maintenance?job=people-inactive",
+      "requestMethod": "GET"
     }
   }
 }

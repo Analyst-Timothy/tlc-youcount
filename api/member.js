@@ -795,7 +795,8 @@ async function findPeopleByName(db, name) {
           ? await db.query(
               `SELECT profile_payload FROM pc_people_cache
                WHERE active=true AND key_fingerprint=$2 AND name_hashes && $1::text[]
-               ORDER BY source_updated_at DESC NULLS LAST LIMIT 500`,
+               ORDER BY CASE WHEN source_status='active' THEN 0 ELSE 1 END,
+                        source_updated_at DESC NULLS LAST LIMIT 500`,
               [hashes, L.hash("pc-cache-key-v1")],
             )
           : [],

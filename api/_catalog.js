@@ -118,9 +118,14 @@ function cachedPerson(person, included, fieldDefinitions) {
     nameHashes: nameFragments.map((token) => L.hash(`pc-name:${token}`)),
     payload: L.encrypt(profile),
     updatedAt: attributes.updated_at || null,
+    sourceStatus:
+      String(attributes.status || "").toLowerCase() === "inactive" ||
+      Boolean(attributes.inactivated_at)
+        ? "inactive"
+        : "active",
   };
 }
-async function syncPeople(db) {
+async function syncPeople(db, requestedStatuses = ["active"]) {
   const definitionRows = await db.query(
       `SELECT id,tab_name,name FROM pc_custom_fields`,
     ),
@@ -130,58 +135,87 @@ async function syncPeople(db) {
         `${item.tab_name || ""} ${item.name || ""}`.trim(),
       ]),
     ),
-    runId = L.token();
-  let offset = 0,
-    count = 0;
-  for (; offset < 100000; offset += 100) {
-    const page = await L.pcFetch(
-        `/people?include=addresses,emails,phone_numbers,field_data,households.people&per_page=100&offset=${offset}`,
+    statuses = [
+      ...new Set(
+        requestedStatuses.filter((status) =>
+          ["active", "inactive"].includes(status),
+        ),
       ),
-      people = page.data || [],
-      rows = people.map((person) =>
-        cachedPerson(person, page.included || [], fieldDefinitions),
-      );
-    if (rows.length) {
-      const values = [],
-        placeholders = rows.map((row, index) => {
-          const base = index * 7;
-          values.push(
-            row.id,
-            row.nameHashes,
-            row.payload,
-            row.updatedAt,
-            runId,
-            L.hash("pc-cache-key-v1"),
-            true,
-          );
-          return `($${base + 1},$${base + 2}::text[],$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7})`;
-        });
-      await db.query(
-        `INSERT INTO pc_people_cache(planning_center_id,name_hashes,profile_payload,source_updated_at,sync_run_id,key_fingerprint,active)
-         VALUES ${placeholders.join(",")}
-         ON CONFLICT(planning_center_id) DO UPDATE SET
-           name_hashes=excluded.name_hashes,profile_payload=excluded.profile_payload,
-           source_updated_at=excluded.source_updated_at,sync_run_id=excluded.sync_run_id,
-           key_fingerprint=excluded.key_fingerprint,
-           active=true,synced_at=now()`,
-        values,
-      );
+    ];
+  if (!statuses.length) throw new Error("people_status_required");
+  let count = 0;
+  const counts = { active: 0, inactive: 0 };
+  for (const requestedStatus of statuses) {
+    const runId = L.token();
+    let statusCount = 0;
+    for (let offset = 0; offset < 100000; offset += 100) {
+      const page = await L.pcFetch(
+          `/people?include=addresses,emails,phone_numbers,field_data,households.people&where[status]=${requestedStatus}&per_page=100&offset=${offset}`,
+        ),
+        people = page.data || [],
+        rows = people.map((person) =>
+          cachedPerson(person, page.included || [], fieldDefinitions),
+        );
+      if (rows.length) {
+        const values = [],
+          placeholders = rows.map((row, index) => {
+            const base = index * 8;
+            values.push(
+              row.id,
+              row.nameHashes,
+              row.payload,
+              row.updatedAt,
+              runId,
+              L.hash("pc-cache-key-v1"),
+              true,
+              row.sourceStatus,
+            );
+            return `($${base + 1},$${base + 2}::text[],$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8})`;
+          });
+        await db.query(
+          `INSERT INTO pc_people_cache(
+             planning_center_id,name_hashes,profile_payload,source_updated_at,
+             sync_run_id,key_fingerprint,active,source_status
+           ) VALUES ${placeholders.join(",")}
+           ON CONFLICT(planning_center_id) DO UPDATE SET
+             name_hashes=excluded.name_hashes,profile_payload=excluded.profile_payload,
+             source_updated_at=excluded.source_updated_at,sync_run_id=excluded.sync_run_id,
+             key_fingerprint=excluded.key_fingerprint,source_status=excluded.source_status,
+             active=true,synced_at=now()`,
+          values,
+        );
+      }
+      statusCount += people.length;
+      if (people.length < 100) break;
     }
-    count += people.length;
-    if (people.length < 100) break;
-  }
-  if (count)
     await db.query(
-      `UPDATE pc_people_cache SET active=false,synced_at=now() WHERE sync_run_id<>$1`,
-      [runId],
+      `UPDATE pc_people_cache SET active=false,synced_at=now()
+       WHERE source_status=$1 AND sync_run_id<>$2`,
+      [requestedStatus, runId],
     );
+    await db.query(
+      `INSERT INTO pc_sync_state(name,value,updated_at)
+       VALUES($1,$2,now())
+       ON CONFLICT(name) DO UPDATE SET value=excluded.value,updated_at=now()`,
+      [
+        `people_cache_${requestedStatus}_ready`,
+        L.hash(`pc-cache-${requestedStatus}-v1`),
+      ],
+    );
+    counts[requestedStatus] = statusCount;
+    count += statusCount;
+  }
   await db.query(
     `INSERT INTO pc_sync_state(name,value,updated_at)
      VALUES('people_cache_ready',$1,now())
      ON CONFLICT(name) DO UPDATE SET value=excluded.value,updated_at=now()`,
     [L.hash("pc-cache-key-v1")],
   );
-  return { people: count };
+  return {
+    people: count,
+    activePeople: counts.active,
+    inactivePeople: counts.inactive,
+  };
 }
 async function syncMemberships(db) {
   const runId = L.token(),
@@ -339,7 +373,7 @@ async function syncCustomFields(db) {
   }
   return { tabs: tabsDoc.data.length, customFields: definitions.length };
 }
-async function syncCatalogues(db) {
+async function syncCatalogues(db, options = {}) {
   let custom;
   try {
     custom = await syncCustomFields(db);
@@ -360,7 +394,7 @@ async function syncCatalogues(db) {
   }
   let people;
   try {
-    people = await syncPeople(db);
+    people = await syncPeople(db, options.peopleStatuses || ["active"]);
   } catch (error) {
     throw new Error(`people_sync_failed:${error.message}`);
   }

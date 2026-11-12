@@ -17,6 +17,8 @@ module.exports = async function handler(req, res) {
       ),
       counts = await db.query(
         `SELECT count(*) FILTER (WHERE active=true)::int AS active,
+                count(*) FILTER (WHERE active=true AND source_status='active')::int AS "activeProfiles",
+                count(*) FILTER (WHERE active=true AND source_status='inactive')::int AS "inactiveProfiles",
                 max(synced_at) FILTER (WHERE active=true) AS "lastSyncedAt"
          FROM pc_people_cache WHERE key_fingerprint=$1`,
         [L.hash("pc-cache-key-v1")],
@@ -24,6 +26,8 @@ module.exports = async function handler(req, res) {
     profileCache = {
       ready: state[0]?.value === L.hash("pc-cache-key-v1"),
       profiles: Number(counts[0]?.active || 0),
+      activeProfiles: Number(counts[0]?.activeProfiles || 0),
+      inactiveProfiles: Number(counts[0]?.inactiveProfiles || 0),
       lastSyncedAt: counts[0]?.lastSyncedAt || state[0]?.updated_at || null,
     };
   } catch {}
