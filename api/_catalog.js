@@ -143,14 +143,38 @@ async function syncPeople(db, requestedStatuses = ["active"]) {
       ),
     ];
   if (!statuses.length) throw new Error("people_status_required");
+  // Each status normally fetches only people changed since its previous run. A
+  // full run, which also marks people no longer returned as removed, happens
+  // weekly, when the cache key changes, or when no earlier run is recorded.
+  const state = Object.fromEntries(
+    (
+      await db.query(
+        `SELECT name,value FROM pc_sync_state WHERE name LIKE 'people_%'`,
+      )
+    ).map((row) => [row.name, row.value]),
+  );
   let count = 0;
-  const counts = { active: 0, inactive: 0 };
+  const counts = { active: 0, inactive: 0 },
+    modes = {};
   for (const requestedStatus of statuses) {
-    const runId = L.token();
+    const runId = L.token(),
+      startedAt = new Date(),
+      lastFull = Date.parse(state[`people_${requestedStatus}_full_sync_at`] || ""),
+      since = Date.parse(state[`people_${requestedStatus}_sync_since`] || ""),
+      full =
+        state.people_cache_ready !== L.hash("pc-cache-key-v1") ||
+        state[`people_cache_${requestedStatus}_ready`] !==
+          L.hash(`pc-cache-${requestedStatus}-v1`) ||
+        !(lastFull > startedAt - 7 * 24 * 60 * 60 * 1000) ||
+        !since,
+      // One hour of overlap covers clock skew and edits made during the last run.
+      filter = full
+        ? ""
+        : `&where[updated_at][gte]=${encodeURIComponent(new Date(since - 60 * 60 * 1000).toISOString())}`;
     let statusCount = 0;
     for (let offset = 0; offset < 100000; offset += 100) {
       const page = await L.pcFetch(
-          `/people?include=addresses,emails,phone_numbers,field_data,households.people&where[status]=${requestedStatus}&per_page=100&offset=${offset}`,
+          `/people?include=addresses,emails,phone_numbers,field_data,households.people&where[status]=${requestedStatus}&per_page=100&offset=${offset}${filter}`,
         ),
         people = page.data || [],
         rows = people.map((person) =>
@@ -188,21 +212,28 @@ async function syncPeople(db, requestedStatuses = ["active"]) {
       statusCount += people.length;
       if (people.length < 100) break;
     }
-    await db.query(
-      `UPDATE pc_people_cache SET active=false,synced_at=now()
-       WHERE source_status=$1 AND sync_run_id<>$2`,
-      [requestedStatus, runId],
-    );
+    // An empty full run is more likely a Planning Center fault than an empty
+    // church, so it never marks everyone as removed.
+    if (full && statusCount)
+      await db.query(
+        `UPDATE pc_people_cache SET active=false,synced_at=now()
+         WHERE source_status=$1 AND sync_run_id<>$2`,
+        [requestedStatus, runId],
+      );
+    const done = [
+      [`people_cache_${requestedStatus}_ready`, L.hash(`pc-cache-${requestedStatus}-v1`)],
+      [`people_${requestedStatus}_sync_since`, startedAt.toISOString()],
+    ];
+    if (full && statusCount)
+      done.push([`people_${requestedStatus}_full_sync_at`, startedAt.toISOString()]);
     await db.query(
       `INSERT INTO pc_sync_state(name,value,updated_at)
-       VALUES($1,$2,now())
+       SELECT unnest($1::text[]),unnest($2::text[]),now()
        ON CONFLICT(name) DO UPDATE SET value=excluded.value,updated_at=now()`,
-      [
-        `people_cache_${requestedStatus}_ready`,
-        L.hash(`pc-cache-${requestedStatus}-v1`),
-      ],
+      [done.map((item) => item[0]), done.map((item) => item[1])],
     );
     counts[requestedStatus] = statusCount;
+    modes[requestedStatus] = full ? "full" : "changed_only";
     count += statusCount;
   }
   await db.query(
@@ -215,6 +246,7 @@ async function syncPeople(db, requestedStatuses = ["active"]) {
     people: count,
     activePeople: counts.active,
     inactivePeople: counts.inactive,
+    peopleSync: modes,
   };
 }
 async function syncMemberships(db) {
