@@ -1,0 +1,9 @@
+.login-card.signup-wide{width:min(720px,calc(100% - 32px))}
+.group-options{max-height:270px;overflow:auto;border:1px solid var(--line);border-radius:12px;margin-top:8px}
+.group-option{display:flex;gap:12px;align-items:flex-start;padding:11px 13px;border-bottom:1px solid var(--line);cursor:pointer}
+.group-option:last-child{border-bottom:0}
+.group-option:hover{background:var(--sky)}
+.group-option input{width:auto;margin-top:4px}
+.group-option span{display:block}
+.group-option small{display:block;color:var(--muted);margin-top:2px}
+details summary{cursor:pointer;color:var(--navy);font-weight:700;font-size:13px}

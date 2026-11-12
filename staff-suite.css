@@ -1,0 +1,442 @@
+/* Staff application hub — selected glass app dock */
+.ops-hub {
+  min-height: 100svh !important;
+  overflow-x: hidden;
+  color: #fff !important;
+  background: #082f52 !important;
+  font-family: "DM Sans", Arial, sans-serif !important;
+}
+
+.ops-hub::before {
+  content: "" !important;
+  position: fixed !important;
+  z-index: 0 !important;
+  inset: 0 !important;
+  display: block !important;
+  background:
+    linear-gradient(rgba(3, 27, 50, .66), rgba(3, 29, 53, .82)),
+    url("assets/staff-community-login-v1.webp") center / cover no-repeat !important;
+}
+
+.ops-hub-glow { display: none !important; }
+
+.ops-hub > header {
+  position: relative !important;
+  z-index: 2 !important;
+  height: 76px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  align-items: center !important;
+  gap: 18px !important;
+  padding: 0 clamp(20px, 5vw, 72px) !important;
+  background: rgba(3, 28, 51, .7) !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .18) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+.ops-hub > header > button {
+  position: static !important;
+  width: auto !important;
+  height: 42px !important;
+  padding: 0 16px !important;
+  border: 1px solid rgba(255, 255, 255, .3) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, .1) !important;
+  box-shadow: none !important;
+  font-family: "DM Sans", Arial, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+.ops-hub > header > button span { margin-right: 6px !important; font-size: 17px !important; }
+
+.ops-hub > header .campaign-wordmark {
+  width: 108px !important;
+  height: 52px !important;
+  display: flex !important;
+  align-items: center !important;
+  margin: 0 !important;
+  filter: none !important;
+}
+.ops-hub > header .campaign-wordmark img {
+  width: 100% !important;
+  height: 48px !important;
+  object-fit: contain !important;
+  object-position: left center !important;
+}
+
+.ops-hub > header > span { display: none !important; }
+
+.ops-hub > main {
+  position: relative !important;
+  z-index: 1 !important;
+  width: min(1080px, calc(100% - 36px)) !important;
+  min-height: calc(100svh - 76px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  padding: 50px 0 26px !important;
+}
+
+.ops-hub .ops-hub-intro {
+  display: block !important;
+  margin: 0 auto 30px !important;
+  text-align: center !important;
+}
+
+.ops-hub .ops-hub-intro .eyebrow { display: none !important; }
+.ops-hub .ops-hub-intro h1 {
+  margin: 0 0 8px !important;
+  color: #fff !important;
+  font-family: "DM Sans", Arial, sans-serif !important;
+  font-size: clamp(36px, 4vw, 50px) !important;
+  font-weight: 650 !important;
+  letter-spacing: -.045em !important;
+  line-height: 1 !important;
+}
+.ops-hub .ops-hub-intro p {
+  margin: 0 !important;
+  color: #d7e2ea !important;
+  font-size: 16px !important;
+}
+
+.ops-hub .ops-app-launcher {
+  width: 100% !important;
+  padding: 28px 28px 25px !important;
+  border: 1px solid rgba(218, 235, 247, .34) !important;
+  border-radius: 28px !important;
+  background: linear-gradient(145deg, rgba(87, 111, 133, .58), rgba(13, 47, 76, .76)) !important;
+  box-shadow: 0 30px 80px rgba(0, 13, 27, .38), inset 0 1px rgba(255, 255, 255, .2) !important;
+  backdrop-filter: blur(24px) saturate(120%) !important;
+}
+
+.ops-hub .ops-app-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.ops-hub .ops-app {
+  position: relative !important;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 174px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding: 12px 6px !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  color: #fff !important;
+  text-align: center !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.ops-hub .ops-app::before,
+.ops-hub .ops-app::after { display: none !important; content: none !important; }
+.ops-hub .ops-app:not(:disabled):hover {
+  transform: translateY(-4px) !important;
+  background: rgba(255, 255, 255, .08) !important;
+}
+
+.ops-hub .ops-app i {
+  position: static !important;
+  width: 82px !important;
+  height: 82px !important;
+  flex: 0 0 82px !important;
+  display: grid !important;
+  place-items: center !important;
+  margin: 0 0 14px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, .3) !important;
+  border-radius: 24px !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px rgba(255, 255, 255, .38), 0 16px 28px rgba(0, 12, 25, .25) !important;
+}
+.ops-hub .ops-app.blue i { background: linear-gradient(145deg, #6fc1ff, #1752c6) !important; }
+.ops-hub .ops-app.rose i { background: linear-gradient(145deg, #fa76bd, #b71369) !important; }
+.ops-hub .ops-app.gold i { background: linear-gradient(145deg, #ffda77, #d38700) !important; }
+.ops-hub .ops-app.mint i { background: linear-gradient(145deg, #92caaa, #477b66) !important; }
+.ops-hub .ops-app svg {
+  width: 46px !important;
+  height: 46px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.65 !important;
+}
+
+.ops-hub .ops-app h2 {
+  order: 2 !important;
+  margin: 0 !important;
+  color: #fff !important;
+  font-family: "DM Sans", Arial, sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 750 !important;
+  letter-spacing: -.025em !important;
+  line-height: 1.2 !important;
+}
+.ops-hub .ops-app > span {
+  order: 3 !important;
+  min-height: 0 !important;
+  margin: 7px 0 0 !important;
+  color: #d3e0e9 !important;
+  font-size: 11px !important;
+  font-weight: 650 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.ops-hub .ops-app p,
+.ops-hub .ops-app em { display: none !important; }
+.ops-hub .ops-app:disabled em {
+  order: 4 !important;
+  display: inline-flex !important;
+  margin-top: 10px !important;
+  padding: 4px 9px !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  border-radius: 999px !important;
+  color: #e3ece8 !important;
+  background: rgba(255,255,255,.08) !important;
+  font-size: 9px !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  letter-spacing: .04em !important;
+  text-transform: uppercase !important;
+}
+.ops-hub .ops-app:disabled { opacity: .58 !important; }
+
+.ops-hub footer {
+  position: static !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  margin-top: auto !important;
+  padding: 20px 0 0 !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, .17) !important;
+  color: #cad8e2 !important;
+  background: transparent !important;
+  font-size: 11px !important;
+}
+.ops-hub footer b { color: #fff !important; }
+
+@media (max-width: 760px) {
+  .ops-hub > header { height: 68px !important; padding: 0 15px !important; }
+  .ops-hub > header .campaign-wordmark { width: 92px !important; height: 46px !important; }
+  .ops-hub > header .campaign-wordmark img { height: 42px !important; }
+  .ops-hub > header > button { height: 38px !important; padding: 0 12px !important; font-size: 11px !important; }
+  .ops-hub > main {
+    min-height: calc(100svh - 68px) !important;
+    justify-content: flex-start !important;
+    padding: 30px 0 20px !important;
+  }
+  .ops-hub .ops-hub-intro { margin-bottom: 22px !important; }
+  .ops-hub .ops-hub-intro h1 { font-size: 34px !important; }
+  .ops-hub .ops-hub-intro p { font-size: 13px !important; }
+  .ops-hub .ops-app-launcher { padding: 22px 12px 18px !important; border-radius: 22px !important; }
+  .ops-hub .ops-app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 7px !important; }
+  .ops-hub .ops-app { min-height: 150px !important; padding: 9px 3px !important; }
+  .ops-hub .ops-app i { width: 64px !important; height: 64px !important; flex-basis: 64px !important; margin-bottom: 11px !important; border-radius: 17px !important; }
+  .ops-hub .ops-app svg { width: 34px !important; height: 34px !important; }
+  .ops-hub .ops-app h2 { font-size: 14px !important; }
+  .ops-hub .ops-app > span { font-size: 9px !important; }
+  .ops-hub footer { margin-top: 25px !important; font-size: 9px !important; }
+}
+
+/* Member Care CRM — compact premium desktop scale */
+@media (min-width: 901px) {
+  .admin {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+
+  .admin .sidebar {
+    position: fixed !important;
+    z-index: 40 !important;
+    inset: 0 auto 0 0 !important;
+    width: 220px !important;
+    height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    padding: 24px 16px !important;
+  }
+
+  .admin .admin-brand {
+    margin: 0 8px 25px !important;
+  }
+
+  .admin .admin-brand .campaign-wordmark {
+    width: 88px !important;
+    height: 58px !important;
+    margin: 0 0 15px !important;
+    transform: none !important;
+  }
+
+  .admin .admin-brand .campaign-wordmark img {
+    width: 88px !important;
+    height: 56px !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+  }
+
+  .admin .admin-brand > b {
+    font-size: 16px !important;
+    letter-spacing: -.025em !important;
+  }
+
+  .admin .admin-brand > small {
+    margin-top: 3px !important;
+    font-size: 7.5px !important;
+    letter-spacing: .13em !important;
+  }
+
+  .admin .nav-label {
+    margin: 17px 11px 7px !important;
+    font-size: 8px !important;
+  }
+
+  .admin .sidebar .nav-btn {
+    min-height: 38px !important;
+    gap: 8px !important;
+    padding: 8px 10px !important;
+    font-size: 11px !important;
+  }
+
+  .admin .sidebar .nav-btn span { width: 17px !important; }
+  .admin .sidebar .nav-btn em { font-size: 8px !important; }
+
+  .admin .queue-toggle {
+    margin: 14px 0 4px !important;
+    padding: 9px 10px !important;
+  }
+
+  .admin .queue-toggle span { font-size: 8px !important; }
+
+  .admin .source-note {
+    padding: 12px !important;
+    font-size: 9px !important;
+    line-height: 1.45 !important;
+  }
+
+  .admin .admin-main {
+    grid-column: 2 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 1580px !important;
+    padding: 25px clamp(22px, 3vw, 42px) !important;
+  }
+
+  .admin .admin-compact-head {
+    margin: -4px 0 20px !important;
+    padding-bottom: 15px !important;
+  }
+
+  .admin .admin-compact-head > label {
+    width: min(510px, 58%) !important;
+    min-height: 42px !important;
+    font-size: 12px !important;
+  }
+
+  .admin .avatar {
+    gap: 8px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .avatar i {
+    width: 31px !important;
+    height: 31px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .avatar .switch {
+    min-height: 36px !important;
+    padding: 0 13px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .member-care-crm { gap: 15px !important; }
+
+  .admin .crm-greeting .eyebrow {
+    font-size: 8px !important;
+    letter-spacing: .13em !important;
+  }
+
+  .admin .crm-greeting h3 {
+    margin: 5px 0 2px !important;
+    font-size: clamp(30px, 3vw, 40px) !important;
+    letter-spacing: -.04em !important;
+  }
+
+  .admin .crm-greeting p { font-size: 12px !important; }
+
+  .admin .crm-summary-cards { gap: 10px !important; }
+
+  .admin .crm-summary-cards > button {
+    grid-template-columns: 40px 1fr auto !important;
+    gap: 10px !important;
+    min-height: 88px !important;
+    padding: 14px !important;
+    border-radius: 13px !important;
+  }
+
+  .admin .crm-summary-cards i {
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 11px !important;
+    font-size: 16px !important;
+  }
+
+  .admin .crm-summary-cards b { font-size: 23px !important; }
+  .admin .crm-summary-cards span { font-size: 9px !important; }
+  .admin .crm-summary-cards em { font-size: 19px !important; }
+
+  .admin .people-list-toolbar {
+    padding: 10px 15px 0 !important;
+  }
+
+  .admin .crm-tabs { gap: 18px !important; }
+  .admin .crm-tabs button {
+    padding: 12px 1px 11px !important;
+    font-size: 11px !important;
+  }
+
+  .admin .people-tools label {
+    min-width: 285px !important;
+    min-height: 36px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .filter-button {
+    min-height: 36px !important;
+    padding: 0 13px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .people-row {
+    min-height: 54px !important;
+    padding: 6px 15px !important;
+    font-size: 10px !important;
+  }
+
+  .admin .people-head {
+    min-height: 34px !important;
+    font-size: 8px !important;
+  }
+
+  .admin .person-cell { gap: 9px !important; }
+  .admin .person-cell > i {
+    width: 33px !important;
+    height: 33px !important;
+    flex-basis: 33px !important;
+    font-size: 10px !important;
+  }
+  .admin .person-cell strong { font-size: 10px !important; }
+  .admin .case-pill,
+  .admin .status-pill { padding: 5px 8px !important; font-size: 8px !important; }
+  .admin .row-chevron { font-size: 18px !important; }
+}

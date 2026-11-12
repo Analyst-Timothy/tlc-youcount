@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TLC You Count Census Campaign Budget</title>
+<style>
+  body { font-family: Arial, sans-serif; color: #123a64; margin: 44px; line-height: 1.45; }
+  h1 { color: #06477e; font-size: 28px; margin-bottom: 4px; }
+  h2 { color: #06477e; font-size: 18px; margin-top: 28px; border-bottom: 2px solid #ec168c; padding-bottom: 5px; }
+  h3 { color: #06477e; font-size: 14px; margin-top: 20px; }
+  .kicker { color: #ec168c; font-size: 11px; font-weight: bold; letter-spacing: 1.5px; }
+  .subtitle { color: #607087; margin-top: 0; }
+  .summary { background: #eef5fb; border-left: 5px solid #f5b323; padding: 16px 18px; margin: 22px 0; }
+  .amount { color: #ec168c; font-size: 26px; font-weight: bold; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0 20px; font-size: 12px; }
+  th { background: #06477e; color: white; text-align: left; padding: 9px; }
+  td { border: 1px solid #d4dfeb; padding: 9px; vertical-align: top; }
+  tr:nth-child(even) td { background: #f6f9fc; }
+  .total td { font-weight: bold; background: #fceaf5 !important; color: #06477e; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 7px; }
+  .small { color: #607087; font-size: 10px; }
+  .approval { border: 2px solid #06477e; padding: 16px; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <div class="kicker">THE LIBERTY CHURCH · YOU COUNT CAMPAIGN</div>
+  <h1>Census Campaign Budget</h1>
+  <p class="subtitle">Member profile verification, TLC ID issuance and anonymous church health survey</p>
+
+  <div class="summary">
+    <strong>Recommended initial campaign approval</strong><br>
+    <span class="amount">£650</span><br>
+    <span>Recommended contingency ceiling: <strong>£800</strong> if participation approaches 5,000 completed profiles.</span>
+  </div>
+
+  <h2>1. Planning basis</h2>
+  <table>
+    <tr><th>Measure</th><th>Planning assumption</th></tr>
+    <tr><td>Total Planning Center database</td><td>Approximately 18,000 records, including historic, inactive and duplicate profiles</td></tr>
+    <tr><td>Average weekly attendance (AWA)</td><td>Approximately 1,300–1,500 across 4–5 locations and first/second services</td></tr>
+    <tr><td>Expected initial campaign reach</td><td>2,500–4,000 unique completed profiles over multiple services and weeks</td></tr>
+    <tr><td>Capacity assumption</td><td>Traffic distributed across locations, services, mobile networks and church Wi-Fi; not 1,500 submissions at one instant</td></tr>
+    <tr><td>Country mix used for costing</td><td>80% UK, 10% Nigeria and 10% US</td></tr>
+    <tr><td>Retry allowance</td><td>Approximately 15% additional SMS sends for delayed or repeated OTP requests</td></tr>
+  </table>
+
+  <h2>2. Recommended budget and what it covers</h2>
+  <table>
+    <tr><th>Budget item</th><th>Purpose</th><th>Recommended provision</th></tr>
+    <tr><td>Twilio Verify and SMS</td><td>One-time passcodes used to verify members before profile information is displayed or updated. Includes geographic pricing differences and resend allowance.</td><td>£450</td></tr>
+    <tr><td>Vercel Pro</td><td>Production hosting for the campaign month, serverless API capacity, scheduled jobs, deployment management and increased operational headroom.</td><td>£20</td></tr>
+    <tr><td>SendGrid email</td><td>Branded confirmation email containing the member's full or temporary TLC ID after successful submission.</td><td>£20</td></tr>
+    <tr><td>Neon database and photo storage</td><td>Encrypted submissions, TLC identity records, audit trail, survey responses, cached group metadata and member-uploaded photographs.</td><td>£25</td></tr>
+    <tr><td>Monitoring and operational allowance</td><td>Usage alerts, production checks and small infrastructure overages during campaign activity.</td><td>£15</td></tr>
+    <tr><td>Contingency</td><td>Unexpected OTP resends, higher Nigerian participation, carrier charges, abandoned verification attempts and participation above forecast.</td><td>£120</td></tr>
+    <tr class="total"><td colspan="2">Recommended initial approval</td><td>£650</td></tr>
+  </table>
+
+  <h2>3. Participation scenarios</h2>
+  <table>
+    <tr><th>Completed profiles</th><th>Estimated SMS cost</th><th>Estimated total campaign cost</th></tr>
+    <tr><td>1,500</td><td>Approximately £165</td><td>£250–£300</td></tr>
+    <tr><td>2,000</td><td>Approximately £220</td><td>£300–£400</td></tr>
+    <tr><td>2,500</td><td>Approximately £275</td><td>£400–£450</td></tr>
+    <tr><td>4,000</td><td>Approximately £440</td><td>£600–£650</td></tr>
+    <tr><td>5,000</td><td>Approximately £550</td><td>£750–£800</td></tr>
+  </table>
+  <p class="small">The 18,000-record database should not be treated as 18,000 active participants. Funding can be increased in stages as verified completion numbers become visible.</p>
+
+  <h2>4. Why SMS is the largest variable</h2>
+  <p>Twilio Verify charges a platform fee for each successful verification plus the destination-country SMS charge. Approximate current unit costs before resend allowance are:</p>
+  <table>
+    <tr><th>Destination</th><th>Approximate successful verification cost</th><th>Budget impact</th></tr>
+    <tr><td>United Kingdom</td><td>US$0.106</td><td>Core campaign assumption</td></tr>
+    <tr><td>United States</td><td>Approximately US$0.062–US$0.064</td><td>Lower than the UK, subject to carrier fees</td></tr>
+    <tr><td>Nigeria</td><td>Approximately US$0.437</td><td>Materially higher; campaign contingency protects against a larger Nigerian share</td></tr>
+  </table>
+
+  <h2>5. Cost controls</h2>
+  <ul>
+    <li>Fund Twilio progressively rather than budgeting against all 18,000 database records.</li>
+    <li>Set low-balance and unusual-spend alerts before campaign launch.</li>
+    <li>Retain per-session, phone and identity security limits while allowing shared church Wi-Fi traffic.</li>
+    <li>Monitor completion by location and service after each Sunday.</li>
+    <li>Send the TLC ID email once per identity, rather than after every subsequent edit.</li>
+    <li>Keep photos compressed and apply the agreed 90-day retention policy to relevant campaign and audit data.</li>
+  </ul>
+
+  <h2>6. Recommendation</h2>
+  <p>Approve <strong>£650</strong> for the initial You Count census campaign. This supports a realistic reach of up to approximately 4,000 completed profiles under the stated country mix. Authorise an additional <strong>£150 contingency</strong> only if participation approaches 5,000 or the proportion of Nigerian SMS destinations is materially higher than assumed.</p>
+
+  <div class="approval">
+    <strong>Approval requested</strong><br><br>
+    Initial campaign budget: <strong>£650</strong><br>
+    Maximum authorised ceiling: <strong>£800</strong><br><br>
+    Approved by: ______________________________<br><br>
+    Date: _____________________________________
+  </div>
+
+  <h2>Sources and qualifications</h2>
+  <ul class="small">
+    <li>Twilio Verify pricing: https://www.twilio.com/en-us/verify/pricing</li>
+    <li>Twilio UK SMS pricing: https://www.twilio.com/en-us/sms/pricing/gb</li>
+    <li>Twilio Nigeria SMS pricing: https://www.twilio.com/en-us/sms/pricing/ng</li>
+    <li>Twilio US SMS pricing: https://www.twilio.com/en-us/sms/pricing/us</li>
+    <li>Vercel Pro pricing: https://vercel.com/docs/plans/pro-plan</li>
+  </ul>
+  <p class="small">Prepared 14 October 2026. Estimates are planning figures, not supplier quotations. Exchange rates, VAT, carrier surcharges, destination mix and supplier pricing may change. Development and church staff time are excluded.</p>
+</body>
+</html>

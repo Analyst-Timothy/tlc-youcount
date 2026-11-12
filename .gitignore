@@ -1,0 +1,28 @@
+# Local agent/project state
+.kimi-memory/
+.vercel/
+
+# Dependencies and generated output
+node_modules/
+test-results/
+playwright-report/
+coverage/
+dist/
+*.log
+
+# Environment variables and signing credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.key
+*.jks
+*.mobileprovision
+
+# Operating-system files
+.DS_Store
+
+# Separate mobile application repository
+/Tm_mobile/

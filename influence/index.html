@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Influence Network product prototype" />
+  <title>Influence Network</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="prototype-bar">Interactive product preview <span>Sample content only</span></div>
+  <header class="topbar"><div class="topbar-inner">
+    <button class="brand" data-nav="home" aria-label="Influence Network home"><span class="brand-mark">IN</span><span>Influence <strong>Network</strong></span></button>
+    <nav class="main-nav" aria-label="Main navigation">
+      <button class="nav-item active" data-nav="home"><span>⌂</span>Home</button>
+      <button class="nav-item" data-nav="requests"><span>◫</span>Open requests <i>4</i></button>
+      <button class="nav-item" data-nav="directory"><span>⌕</span>People & services</button>
+      <button class="nav-item" data-nav="activity"><span>▤</span>My activity</button>
+      <button class="nav-item" data-nav="admin"><span>✓</span>Manage</button>
+    </nav>
+    <button class="user-menu"><span>AG</span><span class="user-copy">Ayo George<small>Member</small></span><b>⌄</b></button>
+  </div></header>
+  <main id="app"></main>
+  <button class="mobile-ask" data-ask>＋ Ask the network</button>
+  <div class="toast" id="toast" role="status"></div>
+
+  <dialog id="askDialog" class="flow-dialog"><form method="dialog" id="askForm">
+    <div class="modal-head"><div><p class="eyebrow">ASK THE NETWORK</p><h2 id="askTitle">What kind of help do you need?</h2></div><button type="button" class="icon-btn" data-close-dialog aria-label="Close">×</button></div>
+    <div id="askSteps"></div>
+  </form></dialog>
+
+  <dialog id="responseDialog"><form method="dialog" id="responseForm">
+    <div class="modal-head"><div><p class="eyebrow">RESPOND PRIVATELY</p><h2>I may be able to help</h2></div><button type="button" class="icon-btn" data-close-dialog aria-label="Close">×</button></div>
+    <p class="modal-intro" id="responsePrompt"></p>
+    <label>Your message<textarea name="message" maxlength="300" required rows="5" placeholder="Briefly say how you can help and the best next step."></textarea></label>
+    <div class="notice"><span>ⓘ</span><p>Your name and message will be shared privately with the requester. It will not appear publicly.</p></div>
+    <div class="modal-actions"><button type="button" class="button secondary" data-close-dialog>Cancel</button><button type="submit" class="button primary">Send response</button></div>
+  </form></dialog>
+
+  <dialog id="contactDialog"><form method="dialog" id="contactForm">
+    <div class="modal-head"><div><p class="eyebrow">PRIVATE ENQUIRY</p><h2>Contact <span id="contactName"></span></h2></div><button type="button" class="icon-btn" data-close-dialog aria-label="Close">×</button></div>
+    <p class="modal-intro">This contacts one particular listing. To ask several suitable people, use Ask the network.</p>
+    <label>What do you need?<textarea name="message" required rows="5" maxlength="300"></textarea></label>
+    <label class="check"><input type="checkbox" required><span>I agree to share these details with this person so they can respond.</span></label>
+    <div class="modal-actions"><button type="button" class="button secondary" data-close-dialog>Cancel</button><button type="submit" class="button primary">Contact privately</button></div>
+  </form></dialog>
+  <script src="app.js"></script>
+</body>
+</html>

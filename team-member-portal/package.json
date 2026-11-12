@@ -1,0 +1,7 @@
+{
+  "name": "tlc-team-member-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "dev": "vercel dev", "check": "node --check app.js && node --check api/_lib.js && node --check api/portal.js" },
+  "dependencies": { "@neondatabase/serverless": "^1.0.1", "@vercel/blob": "2.8.0" }
+}

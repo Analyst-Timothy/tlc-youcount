@@ -1,0 +1,43 @@
+/* TLC brand layer for the dedicated attendance workspace. */
+:root {
+  --navy: #003264;
+  --navy-deep: #001a38;
+  --navy-raised: #0a3f78;
+  --navy-tint: #e2eaf4;
+  --mist: #eef1f6;
+  --ink: #0b1730;
+  --muted: #4e5a70;
+  --line: #d5dbe5;
+  --amber: #f0a500;
+  --amber-hover: #ffb61c;
+  --success: #15803d;
+  --danger: #b42318;
+}
+body, button, input, select, textarea { font-family:"Poppins",system-ui,sans-serif !important; }
+body { color:var(--ink); background:var(--mist); }
+:where(button,input,select,textarea):focus-visible { outline:3px solid var(--amber); outline-offset:3px; }
+h1,h2,h3,.scanner-app>header b { font-family:"Archivo","Arial Black",sans-serif; letter-spacing:-.035em; }
+.login-screen { background:linear-gradient(rgba(0,26,56,.68),rgba(0,26,56,.84)),url("/assets/staff-community-login-v1.webp") center/cover no-repeat !important; }
+.login-card { border-radius:22px; box-shadow:0 30px 60px rgba(0,26,56,.28); }
+.login-card .wordmark { background:var(--navy-deep); }
+.kicker { color:var(--navy); }
+.login-card input,.service-settings input,.service-settings select,#manualScan input,#headcountForm input,#headcountForm textarea { min-height:52px; border:1.5px solid #6e7a90; border-radius:10px; }
+.login-card button,#manualScan button,.camera-actions button,#headcountForm button,.history-mode button { min-height:52px; border:1px solid var(--amber); border-radius:10px; color:var(--ink); background:var(--amber); box-shadow:0 4px 0 #b87900; font-weight:700; }
+.login-card button:hover,#manualScan button:hover,.camera-actions button:hover,#headcountForm button:hover,.history-mode button:hover { background:var(--amber-hover); }
+.scanner-app>header { border-top:4px solid transparent; border-image:linear-gradient(90deg,#e84b4b 0 20%,#3b82f6 20% 40%,#f0a500 40% 60%,#16a34a 60% 80%,#7c3aed 80%) 1; background:var(--navy-deep); }
+.service-settings,.camera-card,.recent,.attendance-panel { border:1px solid var(--line); border-radius:14px; background:#fff; box-shadow:0 12px 32px rgba(0,26,56,.08); }
+.camera-frame { background:linear-gradient(145deg,var(--navy-deep),var(--navy-raised)); }
+.scan-guide i { border-color:var(--amber); }
+.ready { background:var(--navy-tint); }
+.result.success { border-left-color:var(--success); background:#e3f4e8; }
+.result.failed { border-left-color:var(--danger); background:#fde7e4; }
+.result.duplicate { border-left-color:var(--amber); background:#fdefc8; }
+.recent article strong,#headcountStatus { color:var(--success); }
+@media(max-width:560px){
+  .login-screen{width:100vw;max-width:100vw;padding:24px 16px !important;overflow:hidden}
+  .login-card{width:calc(100vw - 32px) !important;max-width:calc(100vw - 32px) !important;padding:25px 22px !important;border-radius:18px}
+  .login-card h1{font-size:clamp(28px,8.6vw,34px);line-height:1.05;overflow-wrap:anywhere}
+  .login-card p{font-size:14px}
+  .login-card .wordmark{width:190px;max-width:72%}
+  .camera-card,.recent,.attendance-panel{border-radius:12px}
+}

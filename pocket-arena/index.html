@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b18" />
+    <title>Pocket Arena</title>
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="home" class="screen active">
+        <div class="brand"><span class="brand-mark">PA</span><span>POCKET ARENA</span></div>
+        <div class="hero-copy">
+          <p class="eyebrow">INSTANT MOBILE MULTIPLAYER</p>
+          <h1>Bring the<br /><em>family fight.</em></h1>
+          <p>Two joysticks. Big weapons. No download. No account.</p>
+        </div>
+        <div class="panel join-panel">
+          <label>YOUR PLAYER NAME</label>
+          <input id="player-name" maxlength="14" autocomplete="nickname" placeholder="Enter a nickname" />
+          <button id="create-room" class="primary">CREATE ROOM <span>→</span></button>
+          <div class="or"><span></span>OR JOIN A ROOM<span></span></div>
+          <div class="code-row">
+            <input id="room-code" maxlength="6" autocomplete="off" autocapitalize="characters" placeholder="ROOM CODE" />
+            <button id="join-room" class="icon-button">→</button>
+          </div>
+          <p id="home-error" class="error"></p>
+        </div>
+      </section>
+
+      <section id="lobby" class="screen">
+        <header class="topbar">
+          <div class="brand compact"><span class="brand-mark">PA</span><span>POCKET ARENA</span></div>
+          <span id="connection-state" class="status-dot">CONNECTED</span>
+        </header>
+        <div class="lobby-grid">
+          <div>
+            <p class="eyebrow">PRIVATE MATCH</p>
+            <h2>Room <button id="copy-code" class="room-badge">------</button></h2>
+            <p class="subtle">Tell everyone the code. No link or sign-in needed.</p>
+            <div id="players" class="player-list"></div>
+          </div>
+          <div class="panel settings-panel">
+            <h3>MATCH SETTINGS</h3>
+            <label>MATCH TIME</label>
+            <div id="time-options" class="time-options">
+              <button data-minutes="2">2 MIN</button><button class="selected" data-minutes="3">3 MIN</button>
+              <button data-minutes="5">5 MIN</button><button data-minutes="7">7 MIN</button>
+            </div>
+            <div class="setting-row"><span>WEAPON PICKUPS</span><span class="pill">ON</span></div>
+            <div class="setting-row"><span>FRAG GRENADES</span><span class="pill">2 / LIFE</span></div>
+            <div id="bot-controls" class="bot-controls hidden">
+              <button id="remove-bot">− BOT</button><span id="bot-count">0 BOTS</span><button id="add-bot">+ BOT</button>
+            </div>
+            <button id="ready-button" class="secondary">I'M READY</button>
+            <button id="start-button" class="primary hidden">START MATCH <span>→</span></button>
+            <p id="lobby-note" class="subtle center">Waiting for the host…</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="game" class="screen game-screen">
+        <canvas id="arena" width="960" height="540"></canvas>
+        <div id="hud">
+          <div class="health-wrap"><span id="health-label">100</span><div class="health-track"><i id="health-bar"></i></div><small>HEALTH</small><div class="fuel-track"><i id="fuel-bar"></i></div><small>NITRO</small></div>
+          <div class="timer"><small>TIME</small><strong id="timer">03:00</strong></div>
+          <div class="weapon-hud"><small id="weapon-name">PISTOL</small><strong id="ammo">∞</strong></div>
+        </div>
+        <div id="score-strip"></div>
+        <div id="kill-feed"></div>
+        <canvas id="minimap" width="180" height="76"></canvas>
+        <div id="game-controls"><button id="pause-button">PAUSE</button><button id="quit-button">QUIT</button></div>
+        <div id="pause-overlay"><strong>PAUSED</strong><span>Host paused the match</span></div>
+        <div id="move-stick" class="joystick"><div class="stick-ring"><i></i></div><small>MOVE / FLY</small></div>
+        <div id="aim-stick" class="joystick right"><div class="stick-ring"><i></i></div><small>AIM / FIRE</small></div>
+        <button id="grenade-button" class="grenade-button"><span>●</span><small id="grenade-count">×2</small></button>
+        <div id="rotate-warning"><strong>ROTATE YOUR PHONE</strong><span>Pocket Arena plays in landscape.</span></div>
+      </section>
+
+      <section id="results" class="screen">
+        <div class="results-card panel">
+          <p class="eyebrow">MATCH COMPLETE</p>
+          <h2 id="winner-title">Winner!</h2>
+          <div id="final-scores" class="final-scores"></div>
+          <button id="rematch-button" class="primary">BACK TO LOBBY <span>→</span></button>
+        </div>
+      </section>
+    </main>
+    <script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>

@@ -1,0 +1,45 @@
+{
+  "regions": ["lhr1"],
+  "functions": {
+    "api/member.js": { "includeFiles": "assets/apple-pass/**" },
+    "api/admin.js": { "includeFiles": "assets/apple-pass/**" },
+    "api/maintenance.js": { "maxDuration": 300 }
+  },
+  "rewrites": [
+    { "source": "/data", "destination": "/index.html" },
+    { "source": "/member-care", "destination": "/index.html" },
+    { "source": "/events", "destination": "/index.html" },
+    { "source": "/check-in", "destination": "/check-in.html" },
+    { "source": "/api/checkin", "destination": "/api/admin?portal=checkin" },
+    { "source": "/api/servespace-launch", "destination": "/api/admin?portal=servespaceLaunch" },
+    { "source": "/api/servespace", "destination": "/api/admin?portal=servespaceSummary" },
+    { "source": "/api/apple-pass", "destination": "/api/member?action=applePass" },
+    { "source": "/api/google-wallet", "destination": "/api/member?action=googleWallet" },
+    { "source": "/passkit/v1/:path*", "destination": "/api/member?action=passkit&path=:path" }
+  ],
+  "headers": [
+    { "source": "/", "headers": [
+      { "key": "Cache-Control", "value": "no-store, max-age=0" }
+    ] },
+    { "source": "/index.html", "headers": [
+      { "key": "Cache-Control", "value": "no-store, max-age=0" }
+    ] },
+    { "source": "/app.js", "headers": [
+      { "key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate" }
+    ] },
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "X-Frame-Options", "value": "DENY" },
+      { "key": "Referrer-Policy", "value": "no-referrer" },
+      { "key": "Permissions-Policy", "value": "camera=(self), microphone=(), geolocation=()" },
+      { "key": "Content-Security-Policy", "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }
+    ] }
+  ],
+  "schedules": {
+    "youcount-maintenance": {
+      "schedule": "15 2 * * *",
+      "path": "/api/maintenance?job=all",
+      "requestMethod": "GET"
+    }
+  }
+}
