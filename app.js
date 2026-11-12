@@ -2603,7 +2603,8 @@ function bind() {
             .filter(Boolean),
         ),
       ];
-      if (!changes.communicationPreference.length) {
+      const mayContact = changes.consent === "Yes";
+      if (mayContact && !changes.communicationPreference.length) {
         const group = e.currentTarget.querySelector(".communication-methods"),
           error = group?.querySelector(".communication-error");
         if (error) error.hidden = false;
@@ -2611,6 +2612,7 @@ function bind() {
         submitButton && (submitButton.disabled = false);
         return;
       }
+      if (!mayContact) changes.communicationPreference = [];
       delete changes.ethnicitySelection;
       changes.volunteeringInterests = [
         ...new Set(
@@ -4295,6 +4297,23 @@ function bindCommunicationOptions() {
     consentField = currentConsent?.closest(".field");
   if (communicationMethods && consentField)
     communicationMethods.insertAdjacentElement("beforebegin", consentField);
+  const updateCommunicationMethods = () => {
+    if (!communicationMethods) return;
+    const mayContact = currentConsent?.value === "Yes";
+    communicationMethods.hidden = !mayContact;
+    communicationMethods
+      .querySelectorAll('input[type="checkbox"]')
+      .forEach((checkbox) => {
+        if (!mayContact) checkbox.checked = false;
+        checkbox.disabled = !mayContact;
+      });
+    const error = communicationMethods.querySelector(".communication-error");
+    if (error) error.hidden = true;
+    if (!mayContact && state.formDraft)
+      state.formDraft.communicationPreference = [];
+  };
+  currentConsent?.addEventListener("change", updateCommunicationMethods);
+  updateCommunicationMethods();
 }
 function ethnicityVariantForCountry(value, region = "") {
   const country = String(value || "").toUpperCase();
