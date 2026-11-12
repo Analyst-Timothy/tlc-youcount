@@ -4135,6 +4135,23 @@ body {
   background: var(--magenta);
   color: #fff;
 }
+.survey-scale input:focus-visible + span {
+  outline: 3px solid rgba(0, 71, 127, 0.24);
+  outline-offset: 3px;
+}
+.survey-validation-message {
+  margin: 8px 0 4px;
+}
+.survey-question.survey-question-error {
+  margin: 8px 0;
+  padding: 18px;
+  border: 1px solid rgba(169, 45, 45, 0.42);
+  border-radius: 14px;
+  background: #fff4f4;
+}
+.survey-question.survey-question-error legend {
+  color: #8e2020;
+}
 .survey-scale-labels {
   display: flex;
   justify-content: space-between;

@@ -1943,9 +1943,23 @@ function bind() {
       "TLC ID",
       "YouCount Number",
     );
-  if ($("#healthSurvey"))
-    $("#healthSurvey").onsubmit = async (event) => {
+  if ($("#healthSurvey")) {
+    const healthSurvey = $("#healthSurvey");
+    healthSurvey.noValidate = true;
+    healthSurvey
+      .querySelectorAll('.survey-question input[type="radio"]')
+      .forEach((input) =>
+        input.addEventListener("change", () => {
+          input.closest(".survey-question")?.classList.remove(
+            "survey-question-error",
+          );
+          input.closest(".survey-question")?.removeAttribute("aria-invalid");
+          healthSurvey.querySelector(".survey-validation-message")?.remove();
+        }),
+      );
+    healthSurvey.onsubmit = async (event) => {
       event.preventDefault();
+      if (!validateSurveyForm(event.currentTarget)) return;
       const button = $("#surveySubmit");
       button.disabled = true;
       try {
@@ -1971,6 +1985,7 @@ function bind() {
         alert(error.message || "We could not submit the survey.");
       }
     };
+  }
   if ($("#campaignContinue"))
     $("#campaignContinue").onclick = () => {
       state.campaignStarted = true;
@@ -2682,6 +2697,7 @@ function bind() {
       state.step = 6;
       saveDraft();
       render();
+      scrollTo(0, 0);
     };
   }
   document.querySelectorAll("[data-choice]").forEach(
@@ -4275,6 +4291,10 @@ function bindCommunicationOptions() {
     const label = currentConsent.closest(".field")?.querySelector("label");
     if (label) label.textContent = "May The Liberty Church contact you?";
   }
+  const communicationMethods = form?.querySelector(".communication-methods"),
+    consentField = currentConsent?.closest(".field");
+  if (communicationMethods && consentField)
+    communicationMethods.insertAdjacentElement("beforebegin", consentField);
 }
 function ethnicityVariantForCountry(value, region = "") {
   const country = String(value || "").toUpperCase();
@@ -4419,6 +4439,38 @@ function validateVisitorForm(form) {
   field?.classList.add("field-error");
   (field || message).scrollIntoView({ behavior: "smooth", block: "center" });
   setTimeout(() => invalid.focus({ preventScroll: true }), 250);
+  return false;
+}
+
+function validateSurveyForm(form) {
+  form.querySelector(".survey-validation-message")?.remove();
+  form.querySelectorAll(".survey-question-error").forEach((question) => {
+    question.classList.remove("survey-question-error");
+    question.removeAttribute("aria-invalid");
+  });
+  const unanswered = [...form.querySelectorAll(".survey-question")].find(
+    (question) =>
+      question.querySelector('input[type="radio"][required]') &&
+      !question.querySelector('input[type="radio"]:checked'),
+  );
+  if (!unanswered) return true;
+  const label = unanswered.querySelector("legend")?.textContent?.trim() ||
+      "the highlighted question",
+    message = document.createElement("div");
+  message.className = "notice red survey-validation-message";
+  message.setAttribute("role", "alert");
+  message.textContent = `Please answer “${label}” before submitting the survey.`;
+  unanswered.classList.add("survey-question-error");
+  unanswered.setAttribute("aria-invalid", "true");
+  unanswered.insertAdjacentElement("beforebegin", message);
+  unanswered.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(
+    () =>
+      unanswered
+        .querySelector('input[type="radio"]')
+        ?.focus({ preventScroll: true }),
+    250,
+  );
   return false;
 }
 
@@ -4664,8 +4716,8 @@ function bindProfileWizard() {
     "maritalStatus",
     "email",
     "phone",
-    "communicationPreference",
     "consent",
+    "communicationPreference",
     "birthDay",
     "ageGroup",
   ].forEach((name) => moveField(name, 1));
