@@ -736,7 +736,7 @@ function memberSuccessMarkup() {
     cardNumber = publicIdParts.join(" ") || String(identity?.publicId || ""),
     cardPreview = identity ? `<div class="youcount-card-preview"><img src="/assets/youcount-card/logo-white.png" alt="The Liberty Church"><span><b>YouCount</b><small>Counted ${new Date().getFullYear()}</small></span><div><div class="youcount-card-number"><em>${esc(cardRoleCode)}</em><b>${esc(cardNumber)}</b></div><strong>${esc(memberName)}</strong><small>${esc(changes.tlcLocation || "The Liberty Church")}</small></div></div>` : "";
   const apple = verified && !isAndroid ? `<form method="post" action="/api/apple-pass" class="wallet-pass-form"><input type="hidden" name="session" value="${esc(state.sessionToken)}"><button class="apple-wallet-button" type="submit"><span></span> Add to Apple Wallet</button></form>` : "";
-  const google = verified && !isAppleMobile ? `<form method="post" action="/api/google-wallet" class="wallet-pass-form google-wallet-form"><input type="hidden" name="session" value="${esc(state.sessionToken)}"><button class="google-wallet-button" type="submit" aria-label="Add to Google Wallet"><img src="/assets/google-wallet/add-to-google-wallet-en-gb.png" width="283" height="50" alt="Add to Google Wallet"></button></form>` : "";
+  const google = verified && !isAppleMobile ? `<form method="post" action="/api/google-wallet" class="wallet-pass-form google-wallet-form"><input type="hidden" name="session" value="${esc(state.sessionToken)}"><button class="google-wallet-button" type="submit" aria-label="Add to Google Wallet"><img src="/assets/google-wallet/add-to-google-wallet-en-gb.png" width="283" height="50" alt="Add to Google Wallet"></button><p class="wallet-action-status" role="status" aria-live="polite"></p></form>` : "";
   const desktopQr = verified && isDesktop ? `<div class="wallet-page-qr"><img src="/assets/youcount-phone-qr.png" alt="QR code to open YouCount on a phone"><span>Open YouCount on your phone</span></div>` : "";
   const identityContent = identity ? `${cardPreview}${verified ? `<div class="wallet-actions">${apple}${google}${desktopQr}</div>` : `<p class="completion-connect-note">Complete Connect to unlock your digital YouCount Card.</p>`}<button class="completion-email-link" id="resendIdentityEmail">Email my number to me</button>${state.identityEmailMessage ? `<p class="identity-email-message" role="status">${esc(state.identityEmailMessage)}</p>` : ""}` : `<div class="notice green">The Data Team will match your submission and confirm your YouCount identity.</div>`;
   return `<div class="success identity-success completion-journey completion-card-screen">${completionProgress("card", state.surveySubmitted)}<span class="campaign-kicker">You’re counted.</span><h2>Thank you, ${esc(changes.firstName || "")}.</h2><p class="lede">This number is yours for life.</p>${identityContent}${state.surveySkipped && !state.surveySubmitted ? `<button class="completion-quiet-link" id="takeSurvey">Take the survey</button>` : ""}<button class="btn ghost full" id="restart">Start again</button><p class="completion-reset-note">Clears your details from this phone, ready for the next person.</p></div>`;
@@ -2776,6 +2776,35 @@ function bind() {
           "The email could not be sent. Please try again later.";
       }
       render();
+    };
+  const googleWalletForm = document.querySelector(".google-wallet-form");
+  if (googleWalletForm)
+    googleWalletForm.onsubmit = async (event) => {
+      event.preventDefault();
+      const button = googleWalletForm.querySelector(".google-wallet-button"),
+        status = googleWalletForm.querySelector(".wallet-action-status");
+      button.disabled = true;
+      button.setAttribute("aria-busy", "true");
+      status.classList.remove("error");
+      status.textContent = "Preparing your Google Wallet card…";
+      try {
+        const result = await api("googleWallet", { response: "json" });
+        const target = new URL(result.url);
+        if (
+          target.protocol !== "https:" ||
+          !["pay.google.com", "wallet.google.com"].includes(target.hostname)
+        )
+          throw new Error("The Google Wallet link was not valid.");
+        status.textContent = "Opening Google Wallet…";
+        window.location.assign(target.href);
+      } catch (error) {
+        status.classList.add("error");
+        status.textContent =
+          error.message ||
+          "Google Wallet could not be opened. Please try again.";
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+      }
     };
   if ($("#restart"))
     $("#restart").onclick = () => {

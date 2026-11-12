@@ -2273,6 +2273,8 @@ module.exports = async function handler(req, res) {
           "issued",
         );
         res.setHeader("Cache-Control", "private, no-store");
+        if (req.body?.response === "json")
+          return L.json(res, 200, { ok: true, url: link });
         return res.redirect(303, link);
       } catch (error) {
         console.error("Google Wallet generation failed", error.message);
