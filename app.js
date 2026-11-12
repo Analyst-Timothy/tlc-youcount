@@ -4501,25 +4501,27 @@ function validateSurveyForm(form) {
     question.classList.remove("survey-question-error");
     question.removeAttribute("aria-invalid");
   });
-  const unanswered = [...form.querySelectorAll(".survey-question")].find(
+  const unanswered = [...form.querySelectorAll(".survey-question")].filter(
     (question) =>
       question.querySelector('input[type="radio"][required]') &&
       !question.querySelector('input[type="radio"]:checked'),
   );
-  if (!unanswered) return true;
-  const label = unanswered.querySelector("legend")?.textContent?.trim() ||
-      "the highlighted question",
-    message = document.createElement("div");
+  if (!unanswered.length) return true;
+  const message = document.createElement("div");
   message.className = "notice red survey-validation-message";
   message.setAttribute("role", "alert");
-  message.textContent = `Please answer “${label}” before submitting the survey.`;
-  unanswered.classList.add("survey-question-error");
-  unanswered.setAttribute("aria-invalid", "true");
-  unanswered.insertAdjacentElement("beforebegin", message);
-  unanswered.scrollIntoView({ behavior: "smooth", block: "center" });
+  message.textContent = `Please answer all ${unanswered.length} highlighted ${
+    unanswered.length === 1 ? "question" : "questions"
+  } before submitting the survey.`;
+  unanswered.forEach((question) => {
+    question.classList.add("survey-question-error");
+    question.setAttribute("aria-invalid", "true");
+  });
+  unanswered[0].insertAdjacentElement("beforebegin", message);
+  unanswered[0].scrollIntoView({ behavior: "smooth", block: "center" });
   setTimeout(
     () =>
-      unanswered
+      unanswered[0]
         .querySelector('input[type="radio"]')
         ?.focus({ preventScroll: true }),
     250,

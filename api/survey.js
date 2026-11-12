@@ -16,6 +16,17 @@ const allowed = new Set([
   "support",
   "comments",
 ]);
+const requiredScaleAnswers = [
+  "belonging",
+  "spiritualGrowth",
+  "worship",
+  "pastoralCare",
+  "groups",
+  "serving",
+  "communication",
+  "safety",
+  "recommend",
+];
 
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return L.json(res, 405, { ok: false });
@@ -37,10 +48,15 @@ module.exports = async function handler(req, res) {
             .slice(0, key === "comments" ? 2000 : 500),
         ]),
     );
-    if (!answers.belonging || !answers.spiritualGrowth || !answers.safety)
+    if (
+      requiredScaleAnswers.some(
+        (key) => !/^[1-5]$/.test(String(answers[key] || "")),
+      )
+    )
       return L.json(res, 400, {
         ok: false,
-        message: "Please answer the required questions.",
+        message:
+          "Please answer every scored question before submitting the survey.",
       });
     const surveyId = String(req.body?.surveyId || "").slice(0, 100);
     if (!/^[a-zA-Z0-9_-]{24,100}$/.test(surveyId))
