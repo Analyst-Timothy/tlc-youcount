@@ -2553,6 +2553,11 @@ module.exports = async function handler(req, res) {
           .filter((key) => key in rawChanges)
           .map((key) => [key, rawChanges[key]]),
       );
+      // Previous test submissions may still contain the attendance option
+      // retired from the current form. Treat it as weekly so returning users
+      // are not blocked by data they can no longer select or correct.
+      if (changes.attendanceFrequency === "More than once a week")
+        changes.attendanceFrequency = "Weekly";
       const permittedGender = new Set(["Male", "Female", "Prefer not to say"]),
         permittedEthnicityCodes = new Set([
           "A1", "A2", "A3", "A4", "A5",

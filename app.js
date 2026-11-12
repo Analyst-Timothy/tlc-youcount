@@ -2986,6 +2986,13 @@ function restoreFormDraft() {
       restoredValue = "Liberty Point Woodford";
     if (key === "tlcLocation" && value === "Other / online")
       restoredValue = "e-TLC";
+    if (
+      key === "attendanceFrequency" &&
+      value === "More than once a week"
+    ) {
+      restoredValue = "Weekly";
+      draft[key] = restoredValue;
+    }
     if ((key === "countryOfOrigin" || key === "countryOfResidence") && value) {
       restoredValue = normaliseCountryCode(value);
       if (restoredValue === "OTHER") draft[`${key}Other`] = String(value);
@@ -4073,13 +4080,8 @@ function bindCensusFields() {
   const currentYear = new Date().getFullYear();
   grid.insertAdjacentHTML(
     "beforeend",
-    `<div class="profile-section-title"><b>Your life and TLC journey</b><span>These details help us understand and care for the people who regularly attend TLC.</span></div><div class="field"><label>Marital status</label><select name="maritalStatus"><option value="">Choose one</option><option>Single</option><option>Married</option><option>Engaged</option><option>Separated</option><option>Divorced</option><option>Widowed</option><option>Prefer not to say</option></select></div><div class="field"><label>How often do you attend TLC?</label><select name="attendanceFrequency"><option value="">Choose one</option><option>More than once a week</option><option>Weekly</option><option>Two or three times a month</option><option>Monthly</option><option>Occasionally</option></select><p class="hint">First-time visitors use a separate welcome journey.</p></div><div class="field"><label>What year did you start attending TLC?</label><select name="yearStartedAttending"><option value="">Choose one</option><option>I’m not sure</option>${Array.from({ length: currentYear - 2014 }, (_, index) => currentYear - index).map((year) => `<option>${year}</option>`).join("")}</select><p class="hint">Choose the year you first began attending TLC.</p></div><div class="field"><label>Would you be interested in the following?</label><select name="pastoralFollowUp"><option value="">Choose one</option></select><p class="hint">We only show options that are relevant to the answers you have given.</p></div>`,
+    `<div class="profile-section-title"><b>Your life and TLC journey</b><span>These details help us understand and care for the people who regularly attend TLC.</span></div><div class="field"><label>Marital status</label><select name="maritalStatus"><option value="">Choose one</option><option>Single</option><option>Married</option><option>Engaged</option><option>Separated</option><option>Divorced</option><option>Widowed</option><option>Prefer not to say</option></select></div><div class="field"><label>How often do you attend TLC?</label><select name="attendanceFrequency"><option value="">Choose one</option><option>Weekly</option><option>Two or three times a month</option><option>Monthly</option><option>Occasionally</option></select><p class="hint">First-time visitors use a separate welcome journey.</p></div><div class="field"><label>What year did you start attending TLC?</label><select name="yearStartedAttending"><option value="">Choose one</option><option>I’m not sure</option>${Array.from({ length: currentYear - 2014 }, (_, index) => currentYear - index).map((year) => `<option>${year}</option>`).join("")}</select><p class="hint">Choose the year you first began attending TLC.</p></div><div class="field"><label>Would you be interested in the following?</label><select name="pastoralFollowUp"><option value="">Choose one</option></select><p class="hint">We only show options that are relevant to the answers you have given.</p></div>`,
   );
-  const attendance = form.elements.namedItem("attendanceFrequency");
-  if (attendance?.tagName === "SELECT")
-    [...attendance.options]
-      .filter((option) => option.value === "More than once a week")
-      .forEach((option) => option.remove());
   const followUpHint = form.elements
     .namedItem("pastoralFollowUp")
     ?.closest(".field")
