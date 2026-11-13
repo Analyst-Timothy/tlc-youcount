@@ -256,30 +256,6 @@ const newPresenceId = () =>
     "-",
     "",
   );
-function surveyBrowserId() {
-  const key = "tlc_anonymous_survey_browser_v1";
-  try {
-    let value = localStorage.getItem(key);
-    if (!value) {
-      value = crypto.randomUUID().replaceAll("-", "");
-      localStorage.setItem(key, value);
-    }
-    return value;
-  } catch {
-    return crypto.randomUUID().replaceAll("-", "");
-  }
-}
-const SURVEY_BROWSER_ID = surveyBrowserId();
-function surveyAlreadySubmitted() {
-  try {
-    const submittedAt = Number(
-      localStorage.getItem("tlc_anonymous_survey_submitted_at") || 0,
-    );
-    return submittedAt > Date.now() - 90 * 24 * 60 * 60 * 1000;
-  } catch {
-    return false;
-  }
-}
 const DRAFT_KEY = "tlc_member_draft_v1";
 function readDraft() {
   try {
@@ -345,7 +321,7 @@ const state = {
   completionStage: "survey",
   surveyReturnToCard: false,
   surveySkipped: false,
-  surveySubmitted: surveyAlreadySubmitted(),
+  surveySubmitted: false,
   surveyUnlocked: false,
   surveyData: [],
   surveyLocationFilter: "all",
@@ -1605,7 +1581,7 @@ async function surveyApi(answers) {
   const response = await fetch("/api/survey", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ answers, surveyId: SURVEY_BROWSER_ID }),
+    body: JSON.stringify({ answers }),
   });
   const data = await response.json().catch(() => ({ ok: false }));
   if (!response.ok) throw new Error(data.message || "Survey unavailable");
@@ -1919,6 +1895,7 @@ function acceptVerification(result) {
 function bind() {
   if ($("#openSurvey"))
     $("#openSurvey").onclick = () => {
+      state.surveySubmitted = false;
       state.mode = "survey";
       history.replaceState(null, "", "#survey");
       render();
@@ -1956,6 +1933,7 @@ function bind() {
     };
   if ($("#surveyHome"))
     $("#surveyHome").onclick = () => {
+      state.surveySubmitted = false;
       state.mode = "member";
       history.replaceState(null, "", location.pathname);
       render();
@@ -2016,12 +1994,6 @@ function bind() {
       try {
         await surveyApi(Object.fromEntries(new FormData(event.target)));
         state.surveySubmitted = true;
-        try {
-          localStorage.setItem(
-            "tlc_anonymous_survey_submitted_at",
-            String(Date.now()),
-          );
-        } catch {}
         if (state.surveyReturnToCard) {
           state.mode = "member";
           state.completionStage = "card";

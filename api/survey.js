@@ -58,38 +58,6 @@ module.exports = async function handler(req, res) {
         message:
           "Please answer every scored question before submitting the survey.",
       });
-    const surveyId = String(req.body?.surveyId || "").slice(0, 100);
-    if (!/^[a-zA-Z0-9_-]{24,100}$/.test(surveyId))
-      return L.json(res, 400, {
-        ok: false,
-        message: "Please refresh the survey and try again.",
-      });
-    if (
-      !(await L.consumeRate(
-        db,
-        "anonymous_survey_device",
-        L.hash(`survey-device:${surveyId}`),
-        3,
-        1440,
-      ))
-    )
-      return L.json(res, 429, {
-        ok: false,
-        message: "This survey has already been submitted from this browser.",
-      });
-    if (
-      !(await L.consumeRate(
-        db,
-        "anonymous_survey_network",
-        L.hash(L.clientIp(req)),
-        2000,
-        1440,
-      ))
-    )
-      return L.json(res, 429, {
-        ok: false,
-        message: "This network has reached today’s safety limit.",
-      });
     await db.query(
       "INSERT INTO survey_responses(survey_version,response_payload) VALUES($1,$2)",
       [VERSION, L.encrypt({ answers })],
