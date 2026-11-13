@@ -955,6 +955,7 @@ async function sendEmailOtp(to, code) {
       : "https://api.resend.com/emails",
     {
       method: "POST",
+      signal: AbortSignal.timeout(10000),
       headers: {
         Authorization: `Bearer ${sendGridKey || resendKey}`,
         "Content-Type": "application/json",
