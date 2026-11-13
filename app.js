@@ -313,7 +313,7 @@ const state = {
   verificationUnavailable: false,
   verificationError: "",
   deliveryMethod: "sms",
-  providers: { sms: false, checked: false },
+  providers: { sms: false, email: false, checked: false },
   manualReview: false,
   duplicateChoices: SAVED_DRAFT?.workflow?.duplicateChoices || {},
   lastIdentity: null,
@@ -672,10 +672,17 @@ function memberStep() {
     if (state.verificationUnavailable)
       return `<div class="verification-unavailable"><span class="campaign-kicker">Automatic verification unavailable</span><h3>We couldn’t verify the details entered.</h3><p class="lede">They may differ from the information currently held. For your protection, we cannot display or confirm a profile without successful text-message verification.</p><div class="notice"><b>You can still continue.</b><br>Check the details and try again, or send your current information securely for the data team to review.</div><div class="verification-options"><button class="btn secondary full" id="retryEvidence">Check and try again</button><button class="btn full" id="manualRoute">Continue without verification</button></div></div>`;
     if (!state.otpSent) {
-      const smsReady = IS_LOCAL || state.providers.sms;
-      return `<h3>Verify by text message</h3><p class="hint">We’ll send a six-digit verification code to the phone already on file. We never display the number held in the church system.</p><button class="btn full" id="sendOtp" ${smsReady ? "" : "disabled"}>Send text verification code</button><div class="changed-details"><p><b>Can’t use the phone number on file?</b><br><span class="hint">Choose this only if you no longer have access to that number. You can submit your current details securely for the Data Team to review.</span></p><button class="btn ghost full" id="manualRoute">Continue without text verification</button></div>`;
+      const smsReady = IS_LOCAL || state.providers.sms,
+        emailReady = IS_LOCAL || state.providers.email,
+        bothReady = smsReady && emailReady,
+        sendCopy = bothReady
+          ? "We’ll send separate six-digit codes by text and email. Enter whichever one reaches you. We never display the contact details held in the church system."
+          : emailReady
+            ? "We’ll send a six-digit verification code to the email already on file. We never display the address held in the church system."
+            : "We’ll send a six-digit verification code to the phone already on file. We never display the number held in the church system.";
+      return `<h3>Verify your contact details</h3><p class="hint">${sendCopy}</p><button class="btn full" id="sendOtp" ${smsReady || emailReady ? "" : "disabled"}>${bothReady ? "Send codes by text and email" : emailReady ? "Send email verification code" : "Send text verification code"}</button><div class="changed-details"><p><b>Can’t use either contact method?</b><br><span class="hint">You can submit your current details securely for the Data Team to review.</span></p><button class="btn ghost full" id="manualRoute">Continue without code verification</button></div>`;
     }
-    return `<h3>Enter your verification code</h3><p class="hint">If all details matched, a six-digit code was sent by text message. We don’t confirm whether a record exists.</p>${state.verificationError ? `<div class="notice red" role="alert">${esc(state.verificationError)}</div>` : ""}${state.attempts ? `<div class="notice ${locked ? "red" : ""}">${locked ? "This session is locked after three attempts. Use the alternative route below." : `We couldn’t complete verification. ${3 - state.attempts} ${3 - state.attempts === 1 ? "try" : "tries"} remaining.`}</div>` : ""}${IS_LOCAL ? `<div class="notice green">Local interface preview. Production sends a real provider code.</div>` : ""}<div class="actions"><input class="input otp-input" id="otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" aria-label="Six-digit verification code" placeholder="6-digit code"><button class="btn secondary" id="otpBtn" ${locked ? "disabled" : ""}>Verify code</button></div><button class="btn ghost full" id="resendOtp" style="margin-top:9px" ${locked ? "disabled" : ""}>Send another code</button><div class="changed-details"><p><b>Didn’t receive the text or changed your number?</b><br><span class="hint">You can submit your current details securely for the Data Team to match and review. Your existing record stays hidden.</span></p><button class="btn ghost full" id="manualRoute">Continue without text verification</button></div>`;
+    return `<h3>Enter your verification code</h3><p class="hint">If all details matched, codes were sent by text and email. Enter either six-digit code. We don’t confirm whether a record exists.</p>${state.verificationError ? `<div class="notice red" role="alert">${esc(state.verificationError)}</div>` : ""}${state.attempts ? `<div class="notice ${locked ? "red" : ""}">${locked ? "This session is locked after three attempts. Use the alternative route below." : `We couldn’t complete verification. ${3 - state.attempts} ${3 - state.attempts === 1 ? "try" : "tries"} remaining.`}</div>` : ""}${IS_LOCAL ? `<div class="notice green">Local interface preview. Production sends real provider codes.</div>` : ""}<div class="actions"><input class="input otp-input" id="otp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" aria-label="Six-digit verification code" placeholder="6-digit code"><button class="btn secondary" id="otpBtn" ${locked ? "disabled" : ""}>Verify code</button></div><button class="btn ghost full" id="resendOtp" style="margin-top:9px" ${locked ? "disabled" : ""}>Send new codes</button><div class="changed-details"><p><b>Didn’t receive either code?</b><br><span class="hint">You can submit your current details securely for the Data Team to match and review. Your existing record stays hidden.</span></p><button class="btn ghost full" id="manualRoute">Continue without code verification</button></div>`;
   }
   if (state.step === 4) {
     const confirmedName = [m?.firstName, m?.lastName].filter(Boolean).join(" ") || "Your TLC profile",
@@ -1836,7 +1843,11 @@ async function loadProviderStatus() {
     });
     if (response.ok) {
       const data = await response.json();
-      state.providers = { sms: Boolean(data.delivery?.sms), checked: true };
+      state.providers = {
+        sms: Boolean(data.delivery?.sms),
+        email: Boolean(data.delivery?.email),
+        checked: true,
+      };
       if (state.step === 3 && !state.otpSent) render();
     }
   } catch {
@@ -2447,7 +2458,7 @@ function bind() {
         state.providers = { ...result.delivery, checked: true };
         state.otpSent = false;
         state.verificationUnavailable = !result.verificationAvailable;
-        state.deliveryMethod = "sms";
+        state.deliveryMethod = "both";
         state.step = 3;
         saveDraft();
         render();
@@ -2518,7 +2529,7 @@ function bind() {
     $("#otpBtn").onclick = async () => {
       const code = $("#otp").value.replace(/\D/g, "");
       if (code.length !== 6) {
-        state.verificationError = "Enter all six digits from the text message.";
+        state.verificationError = "Enter all six digits from either code.";
         render();
         return;
       }
@@ -2532,7 +2543,7 @@ function bind() {
       } catch (error) {
         state.verificationError =
           error.message ||
-          "We could not check that code. Please send another code or continue without text verification.";
+          "We could not check that code. Please send new codes or continue without code verification.";
         render();
       }
     };

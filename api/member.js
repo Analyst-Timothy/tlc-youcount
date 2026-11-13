@@ -924,6 +924,52 @@ async function sendTwilio(to) {
   );
   if (!response.ok) throw new Error("sms_failed");
 }
+function emailOtpConfigured() {
+  return Boolean(process.env.SENDGRID_API_KEY || process.env.RESEND_API_KEY);
+}
+async function sendEmailOtp(to, code) {
+  const sendGridKey = process.env.SENDGRID_API_KEY,
+    resendKey = process.env.RESEND_API_KEY;
+  if ((!sendGridKey && !resendKey) || !to) throw new Error("email_unavailable");
+  const fromAddress =
+      process.env.IDENTITY_FROM_EMAIL || "datateam@thelibertychurchlondon.com",
+    fromName = process.env.IDENTITY_FROM_NAME || "The Liberty Church Data Team",
+    subject = "Your YouCount verification code",
+    text = `Your YouCount verification code is ${code}. It expires in 10 minutes. If you did not request this code, you can ignore this email.`,
+    emailHtml = `<!doctype html><html><body style="margin:0;background:#f5f1ed;font-family:Arial,Helvetica,sans-serif;color:#062f52"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f1ed"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#fff;border-radius:16px;overflow:hidden"><tr><td><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="table-layout:fixed"><tr><td height="6" bgcolor="#ef5350"></td><td bgcolor="#3888e8"></td><td bgcolor="#f4b000"></td><td bgcolor="#27a95b"></td><td bgcolor="#7c35c8"></td></tr></table></td></tr><tr><td style="background:#062f52;padding:24px 30px;color:#fff"><div style="font-size:13px;font-weight:800;letter-spacing:2px;color:#f0a500">YOUCOUNT</div><h1 style="margin:10px 0 0;font-size:26px;line-height:1.2">Your verification code</h1></td></tr><tr><td style="padding:32px 30px"><p style="margin:0 0 22px;color:#586779;font-size:16px;line-height:1.55">Enter this code on the YouCount page. It expires in 10 minutes.</p><div style="padding:20px;border-radius:12px;background:#eef3f8;color:#062f52;text-align:center;font-size:36px;font-weight:800;letter-spacing:8px">${html(code)}</div><p style="margin:24px 0 0;color:#667585;font-size:13px;line-height:1.5">If you did not request this code, you can safely ignore this email. Never share a verification code with anyone.</p></td></tr></table></td></tr></table></body></html>`;
+  const response = await fetch(
+    sendGridKey
+      ? "https://api.sendgrid.com/v3/mail/send"
+      : "https://api.resend.com/emails",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${sendGridKey || resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(
+        sendGridKey
+          ? {
+              personalizations: [{ to: [{ email: to }] }],
+              from: { email: fromAddress, name: fromName },
+              subject,
+              content: [
+                { type: "text/plain", value: text },
+                { type: "text/html", value: emailHtml },
+              ],
+            }
+          : {
+              from: `${fromName} <${fromAddress}>`,
+              to: [to],
+              subject,
+              text,
+              html: emailHtml,
+            },
+      ),
+    },
+  );
+  if (!response.ok) throw new Error("email_failed");
+}
 async function checkTwilio(to, code) {
   const sid = process.env.TWILIO_ACCOUNT_SID,
     auth = process.env.TWILIO_AUTH_TOKEN,
@@ -1856,9 +1902,13 @@ module.exports = async function handler(req, res) {
         ),
       );
       const matchedPhone = matched[0]?.phones.find((phone) =>
-        L.digits(phone).endsWith(last3),
-      );
+          L.digits(phone).endsWith(last3),
+        ),
+        matchedEmail = matched[0]?.emails.find(
+          (candidateEmail) => L.normalizeEmail(candidateEmail) === email,
+        );
       payload.matchedPhone = matchedPhone || null;
+      payload.matchedEmail = matchedEmail || null;
       payload.clusterMode =
         matched.length > 1
           ? samePersonCluster(matched)
@@ -1883,13 +1933,20 @@ module.exports = async function handler(req, res) {
       return L.json(res, 200, {
         ...generic,
         testProfile: isTestProfile(matched[0]),
-        verificationAvailable: Boolean(matched.length && matchedPhone),
-        delivery: { sms: Boolean(process.env.TWILIO_VERIFY_SERVICE_SID) },
+        verificationAvailable: Boolean(
+          matched.length &&
+            ((matchedPhone && process.env.TWILIO_VERIFY_SERVICE_SID) ||
+              (matchedEmail && emailOtpConfigured())),
+        ),
+        delivery: {
+          sms: Boolean(process.env.TWILIO_VERIFY_SERVICE_SID),
+          email: emailOtpConfigured(),
+        },
       });
     }
     if (action === "send") {
       const claimed = await db.query(
-        "UPDATE verification_sessions SET sends=sends+1,delivery='sms',updated_at=now() WHERE id=$1 AND sends<3 RETURNING sends",
+        "UPDATE verification_sessions SET sends=sends+1,updated_at=now() WHERE id=$1 AND sends<3 RETURNING sends",
         [s.id],
       );
       if (!claimed.length)
@@ -1900,21 +1957,47 @@ module.exports = async function handler(req, res) {
       const matched = s.matched_payload ? L.decrypt(s.matched_payload) : [];
       const person = matched[0],
         payload = L.decrypt(s.payload),
-        otpPhone = payload.matchedPhone;
-      let delivered = false;
-      try {
-        if (person && otpPhone) {
-          await sendTwilio(otpPhone);
-          delivered = true;
-        }
-      } catch {}
+        otpPhone = payload.matchedPhone,
+        otpEmail = payload.matchedEmail,
+        emailCode = String(crypto.randomInt(100000, 1000000)),
+        emailExpiresAt = Date.now() + 10 * 60 * 1000;
+      payload.emailOtpExpiresAt = emailExpiresAt;
+      const emailOtpHash =
+        person && otpEmail && emailOtpConfigured()
+          ? L.hash(`email-otp:${s.id}:${emailCode}`)
+          : null;
+      await db.query(
+        "UPDATE verification_sessions SET payload=$1,otp_hash=$2,delivery=$3,updated_at=now() WHERE id=$4",
+        [
+          L.encrypt(payload),
+          emailOtpHash,
+          emailOtpHash && otpPhone ? "sms,email" : emailOtpHash ? "email" : "sms",
+          s.id,
+        ],
+      );
+      const [smsResult, emailResult] = await Promise.allSettled([
+        person && otpPhone
+          ? sendTwilio(otpPhone)
+          : Promise.reject(new Error("sms_unavailable")),
+        person && otpEmail && emailOtpHash
+          ? sendEmailOtp(otpEmail, emailCode)
+          : Promise.reject(new Error("email_unavailable")),
+      ]);
+      const delivered = [
+        smsResult.status === "fulfilled" ? "sms" : null,
+        emailResult.status === "fulfilled" ? "email" : null,
+      ].filter(Boolean);
       await L.audit(
         db,
         s.id,
         ipHash,
         "otp_requested",
-        { method: "sms" },
-        delivered ? "sent" : "not_sent",
+        { methods: delivered },
+        delivered.length === 2
+          ? "sent_both"
+          : delivered.length === 1
+            ? "sent_one"
+            : "not_sent",
       );
       await sleep(500);
       return L.json(res, 200, generic);
@@ -1929,13 +2012,20 @@ module.exports = async function handler(req, res) {
         otpPhone = sessionPayload.matchedPhone;
       const testProfile =
         Boolean(req.body?.testProfile) && isTestProfile(person);
-      let approved = testProfile;
+      const emailApproved = Boolean(
+        !testProfile &&
+          s.otp_hash &&
+          code.length === 6 &&
+          Number(sessionPayload.emailOtpExpiresAt || 0) >= Date.now() &&
+          L.safeEqual(s.otp_hash, L.hash(`email-otp:${s.id}:${code}`)),
+      );
+      let approved = testProfile || emailApproved;
       try {
-        if (!testProfile && person && code.length === 6 && otpPhone)
+        if (!approved && person && code.length === 6 && otpPhone)
           approved = await checkTwilio(otpPhone, code);
       } catch {}
       const attemptRows = await db.query(
-        "UPDATE verification_sessions SET attempts=CASE WHEN $2 THEN attempts ELSE attempts+1 END,verified_at=CASE WHEN $2 THEN now() ELSE verified_at END,expires_at=CASE WHEN $2 THEN now()+interval '2 hours' ELSE expires_at END,locked_until=CASE WHEN NOT $2 AND attempts+1>=3 THEN now()+interval '30 minutes' ELSE locked_until END,updated_at=now() WHERE id=$1 RETURNING attempts,locked_until",
+        "UPDATE verification_sessions SET attempts=CASE WHEN $2 THEN attempts ELSE attempts+1 END,verified_at=CASE WHEN $2 THEN now() ELSE verified_at END,expires_at=CASE WHEN $2 THEN now()+interval '2 hours' ELSE expires_at END,locked_until=CASE WHEN NOT $2 AND attempts+1>=3 THEN now()+interval '30 minutes' ELSE locked_until END,otp_hash=CASE WHEN $2 THEN NULL ELSE otp_hash END,updated_at=now() WHERE id=$1 RETURNING attempts,locked_until",
         [s.id, approved],
       );
       const attempts = Number(attemptRows[0]?.attempts || 0),
@@ -1951,7 +2041,7 @@ module.exports = async function handler(req, res) {
           : locked
             ? "locked"
             : "otp_failed",
-        null,
+        approved ? { method: emailApproved ? "email" : "sms" } : null,
         approved ? "approved" : "rejected",
       );
       if (!approved)
