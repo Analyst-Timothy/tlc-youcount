@@ -322,6 +322,8 @@ const state = {
   surveyReturnToCard: false,
   surveySkipped: false,
   surveySubmitted: false,
+  surveyDraft: {},
+  surveyEntrySource: "",
   surveyUnlocked: false,
   surveyData: [],
   surveyLocationFilter: "all",
@@ -404,7 +406,8 @@ const state = {
     },
   ],
 };
-if (location.hash === "#survey") state.mode = "survey";
+if (PRODUCT_PATH === "/survey" || location.hash === "#survey")
+  state.mode = "survey";
 if (location.hash === "#faq") state.mode = "faq";
 if (SAVED_DRAFT?.workflow) Object.assign(state, SAVED_DRAFT.workflow);
 if (
@@ -467,6 +470,9 @@ function resetMemberJourney() {
     completionStage: "survey",
     surveyReturnToCard: false,
     surveySkipped: false,
+    surveySubmitted: false,
+    surveyDraft: {},
+    surveyEntrySource: "",
     contactMatched: false,
     matchedDuplicateIds: [],
     duplicateCandidates: [],
@@ -725,6 +731,12 @@ function completionProgress(active = "survey", surveyDone = false) {
   const activeIndex = steps.findIndex(([key]) => key === active);
   return `<div class="completion-progress" aria-label="YouCount journey progress"><b>${active === "card" && surveyDone ? "All 3 steps done" : `Step ${activeIndex + 1} of 3`}</b><div>${steps.map(([key, label], index) => { const done = index < activeIndex || (key === "survey" && surveyDone); const status = key === active && !done ? "Now" : done ? "Done" : "Next"; return `<section class="${done ? "done" : key === active ? "now" : "next"}"><i></i><strong>${label}</strong><span>${done ? "✓ " : ""}${status}</span></section>`; }).join("")}</div></div>`;
 }
+function surveyInvitationMarkup(profileSaved = true) {
+  return `<div class="success identity-success completion-journey">${profileSaved ? `${completionProgress("survey", false)}<div class="completion-confirmation"><i>✓</i><span><b>Profile saved.</b> We’ve emailed you your YouCount number.</span></div>` : ""}<span class="campaign-kicker">Share your voice</span><h2>Tell us honestly how church life is for you.</h2><p class="lede">The survey is anonymous. Your answers are kept apart from your profile.</p><button class="btn full" id="takeSurvey" type="button">Start the survey</button>${profileSaved ? '<a class="completion-quiet-link" id="skipSurvey" href="#">Skip for now and get my card</a>' : ""}</div>`;
+}
+function standaloneSurveyInvitationPage() {
+  return `<div class="survey-page"><header>${campaignWordmark()}</header><main class="survey-card">${surveyInvitationMarkup(false)}</main></div>`;
+}
 function memberSuccessMarkup() {
   const identity = state.lastIdentity,
     verified = Boolean(identity?.walletEligible),
@@ -733,7 +745,7 @@ function memberSuccessMarkup() {
     isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent),
     isDesktop = !isMobile;
   if (state.completionStage !== "card")
-    return `<div class="success identity-success completion-journey">${completionProgress("survey", false)}<div class="completion-confirmation"><i>✓</i><span><b>Profile saved.</b> We’ve emailed you your YouCount number.</span></div><span class="campaign-kicker">Share your voice</span><h2>Tell us honestly how church life is for you.</h2><p class="lede">The survey is anonymous. Your answers are kept apart from your profile.</p><button class="btn full" id="takeSurvey">Start the survey</button><button class="completion-quiet-link" id="skipSurvey">Skip for now and get my card</button></div>`;
+    return surveyInvitationMarkup(true);
   const publicIdParts = String(identity?.publicId || "").trim().split(/\s+/),
     cardRoleCode = publicIdParts.length > 1 ? publicIdParts.shift() : "YC",
     cardNumber = publicIdParts.join(" ") || String(identity?.publicId || ""),
@@ -743,6 +755,67 @@ function memberSuccessMarkup() {
   const desktopQr = verified && isDesktop ? `<div class="wallet-page-qr"><img src="/assets/youcount-phone-qr.png" alt="QR code to open YouCount on a phone"><span>Open YouCount on your phone</span></div>` : "";
   const identityContent = identity ? `${cardPreview}${verified ? `<div class="wallet-actions">${apple}${google}${desktopQr}</div>` : `<p class="completion-connect-note">Complete Connect to unlock your digital YouCount Card.</p>`}<button class="completion-email-link" id="resendIdentityEmail">Email my number to me</button>${state.identityEmailMessage ? `<p class="identity-email-message" role="status">${esc(state.identityEmailMessage)}</p>` : ""}` : `<div class="notice green">The Data Team will match your submission and confirm your YouCount identity.</div>`;
   return `<div class="success identity-success completion-journey completion-card-screen">${completionProgress("card", state.surveySubmitted)}<span class="campaign-kicker">You’re counted.</span><h2>Thank you, ${esc(changes.firstName || "")}.</h2><p class="lede">This number is yours for life.</p>${identityContent}${state.surveySkipped && !state.surveySubmitted ? `<button class="completion-quiet-link" id="takeSurvey">Take the survey</button>` : ""}<button class="btn ghost full" id="restart">Start again</button><p class="completion-reset-note">Clears your details from this phone, ready for the next person.</p></div>`;
+}
+function captureSurveyDraft(form = document.querySelector("#healthSurvey")) {
+  if (!form) return;
+  state.surveyDraft = {
+    ...state.surveyDraft,
+    ...Object.fromEntries(new FormData(form)),
+  };
+}
+function restoreSurveyDraft(form) {
+  if (!form) return;
+  Object.entries(state.surveyDraft || {}).forEach(([name, value]) => {
+    const controls = form.querySelectorAll(`[name="${name}"]`);
+    controls.forEach((control) => {
+      if (control.type === "radio" || control.type === "checkbox")
+        control.checked = control.value === String(value);
+      else control.value = String(value ?? "");
+    });
+  });
+}
+function applyCompletionStep(step, source = "") {
+  if (step === "survey") {
+    state.mode = "survey";
+    state.surveyEntrySource = source;
+    state.surveyReturnToCard = source === "card";
+    return;
+  }
+  if (step === "card" && state.step >= 7) {
+    state.mode = "member";
+    state.completionStage = "card";
+    return;
+  }
+  if (step === "share" && state.step >= 7) {
+    state.mode = "member";
+    state.completionStage = "survey";
+    state.surveyReturnToCard = false;
+    return;
+  }
+  state.mode = "survey-invitation";
+  state.surveyReturnToCard = false;
+}
+function navigateCompletion(step, { historyMode = "push", source = "" } = {}) {
+  applyCompletionStep(step, source);
+  const historyState = { ycStep: step };
+  if (source) historyState.ycFrom = source;
+  if (historyMode === "push") history.pushState(historyState, "");
+  if (historyMode === "replace") history.replaceState(historyState, "");
+  render();
+  scrollTo(0, 0);
+}
+function renderCompletionHistoryStep(eventState) {
+  let step = eventState?.ycStep;
+  if (!new Set(["share", "survey", "card"]).has(step)) {
+    if (state.step < 7) return;
+    navigateCompletion("card", { historyMode: "push" });
+    return;
+  }
+  if (state.step >= 7 && state.surveySubmitted && step !== "card")
+    step = "card";
+  applyCompletionStep(step, eventState?.ycFrom || "");
+  render();
+  scrollTo(0, 0);
 }
 function memberReviewCard() {
   const changes = state.pendingUpdate || {},
@@ -1540,6 +1613,8 @@ function render() {
   document.getElementById("app").innerHTML =
     state.mode === "survey"
       ? surveyPage()
+      : state.mode === "survey-invitation"
+        ? standaloneSurveyInvitationPage()
       : state.mode === "faq"
       ? faqPage()
       : state.mode === "member"
@@ -1555,7 +1630,11 @@ function render() {
                 : state.mode === "events"
                   ? eventOperationsComingSoon()
                 : admin();
-  if (state.mode === "survey" || state.mode === "member")
+  if (
+    state.mode === "survey" ||
+    state.mode === "survey-invitation" ||
+    state.mode === "member"
+  )
     document.getElementById("app").insertAdjacentHTML("beforeend", faqHelp());
   bind();
   scheduleJourneyPresence();
@@ -1908,10 +1987,8 @@ function bind() {
   if ($("#openSurvey"))
     $("#openSurvey").onclick = () => {
       state.surveySubmitted = false;
-      state.mode = "survey";
-      history.replaceState(null, "", "#survey");
-      render();
-      scrollTo(0, 0);
+      state.surveyEntrySource = "";
+      navigateCompletion("survey", { historyMode: "push" });
     };
   if ($("#faqFab")) {
     const sheet = $("#faqSheet");
@@ -1986,7 +2063,16 @@ function bind() {
     );
   if ($("#healthSurvey")) {
     const healthSurvey = $("#healthSurvey");
+    healthSurvey
+      .closest(".survey-card")
+      ?.insertAdjacentHTML(
+        "afterbegin",
+        '<div class="survey-step-back"><button type="button" id="surveyBack">‹ Back</button><small>Answers are kept</small></div>',
+      );
+    restoreSurveyDraft(healthSurvey);
     healthSurvey.noValidate = true;
+    healthSurvey.addEventListener("input", () => captureSurveyDraft(healthSurvey));
+    healthSurvey.addEventListener("change", () => captureSurveyDraft(healthSurvey));
     healthSurvey
       .querySelectorAll('.survey-question input[type="radio"]')
       .forEach((input) =>
@@ -2001,17 +2087,18 @@ function bind() {
     healthSurvey.onsubmit = async (event) => {
       event.preventDefault();
       if (!validateSurveyForm(event.currentTarget)) return;
+      captureSurveyDraft(event.currentTarget);
       const button = $("#surveySubmit");
       button.disabled = true;
       try {
-        await surveyApi(Object.fromEntries(new FormData(event.target)));
+        await surveyApi(state.surveyDraft);
         state.surveySubmitted = true;
-        if (state.surveyReturnToCard) {
-          state.mode = "member";
-          state.completionStage = "card";
+        if (state.step >= 7 || state.surveyReturnToCard) {
           state.surveySkipped = false;
           state.surveyReturnToCard = false;
-          history.replaceState(null, "", location.pathname);
+          state.surveyEntrySource = "";
+          navigateCompletion("card", { historyMode: "push" });
+          return;
         }
         render();
         scrollTo(0, 0);
@@ -2021,6 +2108,14 @@ function bind() {
       }
     };
   }
+  if ($("#surveyBack"))
+    $("#surveyBack").onclick = () => {
+      captureSurveyDraft();
+      const target = state.surveyReturnToCard ? "card" : "share";
+      if (state.surveyEntrySource && history.state?.ycStep === "survey")
+        history.back();
+      else navigateCompletion(target, { historyMode: "replace" });
+    };
   if ($("#campaignContinue"))
     $("#campaignContinue").onclick = () => {
       state.campaignStarted = true;
@@ -2776,7 +2871,9 @@ function bind() {
         state.surveySkipped = false;
         clearDraft();
         state.step = 7;
-        render();
+        navigateCompletion(state.surveySubmitted ? "card" : "share", {
+          historyMode: "push",
+        });
       } catch (error) {
         render();
         alert(
@@ -2839,22 +2936,22 @@ function bind() {
   if ($("#restart"))
     $("#restart").onclick = () => {
       resetMemberJourney();
+      history.replaceState(null, "", location.pathname);
       render();
     };
   if ($("#takeSurvey"))
     $("#takeSurvey").onclick = () => {
-      state.surveyReturnToCard = true;
-      state.mode = "survey";
-      history.replaceState(null, "", "#survey");
-      render();
-      scrollTo(0, 0);
+      const source =
+        state.mode === "member" && state.completionStage === "card"
+          ? "card"
+          : "share";
+      navigateCompletion("survey", { historyMode: "push", source });
     };
   if ($("#skipSurvey"))
-    $("#skipSurvey").onclick = () => {
-      state.completionStage = "card";
+    $("#skipSurvey").onclick = (event) => {
+      event.preventDefault();
       state.surveySkipped = true;
-      render();
-      scrollTo(0, 0);
+      navigateCompletion("card", { historyMode: "push" });
     };
   document.querySelectorAll("[data-view]").forEach(
     (b) =>
@@ -5123,7 +5220,25 @@ async function bootstrapProductRoute() {
   } else if (PRODUCT_PATH === "/events") {
     state.mode = "events";
   }
+  if (state.mode === "survey")
+    history.replaceState({ ycStep: "survey" }, "");
   render();
   loadProviderStatus();
 }
+window.addEventListener("popstate", (event) => {
+  const step = event.state?.ycStep,
+    isCompletionStep = ["share", "survey", "card"].includes(step),
+    completionJourneyActive =
+      state.step >= 7 ||
+      PRODUCT_PATH === "/survey" ||
+      state.mode === "survey" ||
+      state.mode === "survey-invitation";
+  if (isCompletionStep && completionJourneyActive) {
+    captureSurveyDraft();
+    renderCompletionHistoryStep(event.state);
+    return;
+  }
+  if (!isCompletionStep && state.step >= 7)
+    renderCompletionHistoryStep(event.state);
+});
 bootstrapProductRoute();

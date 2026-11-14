@@ -9,6 +9,7 @@
     { "source": "/data", "destination": "/index.html" },
     { "source": "/member-care", "destination": "/index.html" },
     { "source": "/events", "destination": "/index.html" },
+    { "source": "/survey", "destination": "/index.html" },
     { "source": "/check-in", "destination": "/check-in.html" },
     { "source": "/api/checkin", "destination": "/api/admin?portal=checkin" },
     { "source": "/api/servespace-launch", "destination": "/api/admin?portal=servespaceLaunch" },

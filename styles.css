@@ -3734,6 +3734,9 @@ body {
 .completion-confirmation { display: flex; align-items: flex-start; gap: 12px; margin: 0 0 30px; padding: 17px 18px; border-radius: 16px; background: #e4f4e9; color: #17652f; }
 .completion-confirmation i { flex: 0 0 auto; font-style: normal; font-weight: 900; }
 .completion-confirmation span { line-height: 1.5; }
+.survey-step-back { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 28px; }
+.survey-step-back button { min-height: 44px; padding: 6px 2px; border: 0; background: transparent; color: var(--navy); font: inherit; font-weight: 800; text-decoration: underline; cursor: pointer; }
+.survey-step-back small { color: var(--muted); font-size: 12px; }
 .completion-journey > .campaign-kicker { display: block !important; margin: 0 0 10px; color: var(--navy); }
 .completion-journey > h2 { margin: 0 0 12px; color: var(--navy); font-size: clamp(27px, 6vw, 43px); }
 .completion-journey > .lede { margin: 0 0 28px; color: var(--muted); font-size: 15px; text-align: left; }
