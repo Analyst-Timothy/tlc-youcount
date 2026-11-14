@@ -1,6 +1,6 @@
 const L = require("./_lib");
 
-const VERSION = "church-health-pilot-1";
+const VERSION = "church-health-2";
 const allowed = new Set([
   "campus",
   "belonging",
@@ -11,6 +11,7 @@ const allowed = new Set([
   "serving",
   "communication",
   "safety",
+  "leadershipResponse",
   "recommend",
   "barriers",
   "support",
@@ -25,6 +26,7 @@ const requiredScaleAnswers = [
   "serving",
   "communication",
   "safety",
+  "leadershipResponse",
   "recommend",
 ];
 
