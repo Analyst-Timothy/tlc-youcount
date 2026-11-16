@@ -2,7 +2,7 @@ const L = require("./api/_lib");
 
 const COOKIE = "tlc_checkin_staff";
 const LOCATIONS = [
-  "Woodford",
+  "Liberty Point Woodford",
   "North London",
   "Canary Wharf",
   "Croydon",

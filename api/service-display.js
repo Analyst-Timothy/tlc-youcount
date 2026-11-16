@@ -135,17 +135,18 @@ async function summary(db) {
       GROUP BY journey_type ORDER BY journey_type
     `),
     checkinBreakdown = await db.query(`
-      SELECT location,count(*)::int AS identified
+      SELECT CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END AS location,
+             count(*)::int AS identified
       FROM checkin_events
       WHERE service_date=(now() AT TIME ZONE 'Europe/London')::date
-      GROUP BY location ORDER BY location
+      GROUP BY 1 ORDER BY 1
     `),
     headcountBreakdown = await db.query(`
-      SELECT location,
+      SELECT CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END AS location,
              sum(male_count+female_count+children_count)::int AS room_total
       FROM attendance_headcounts
       WHERE service_date=(now() AT TIME ZONE 'Europe/London')::date
-      GROUP BY location ORDER BY location
+      GROUP BY 1 ORDER BY 1
     `);
 
   const enteredAttendance = number(targetRows[0]?.service_attendance),

@@ -72,3 +72,14 @@ test("admin attendance saves a location map", () => {
   assert.match(app, /adminApi\("operationsTarget", \{ attendance, locationAttendance \}\)/);
   assert.match(api, /operations_location_attendance/);
 });
+
+test("Woodford uses one canonical location name", () => {
+  const checkin = source("checkin-handler.js");
+  const displayApi = source("api/service-display.js");
+  assert.match(checkin, /"Liberty Point Woodford"/);
+  assert.doesNotMatch(checkin, /\n\s*"Woodford",/);
+  assert.match(
+    displayApi,
+    /WHEN location='Woodford' THEN 'Liberty Point Woodford'/,
+  );
+});
