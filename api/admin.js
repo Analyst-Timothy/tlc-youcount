@@ -575,25 +575,59 @@ module.exports = async function handler(req, res) {
       });
     }
     if (action === "operationsTarget") {
-      const attendance = Math.max(
-        0,
-        Math.min(50000, Math.round(Number(req.body?.attendance) || 0)),
-      );
+      const requestedLocations = req.body?.locationAttendance,
+        locationAttendance = Object.fromEntries(
+          CHECKIN_LOCATIONS.map((location) => [
+            location,
+            Math.max(
+              0,
+              Math.min(
+                50000,
+                Math.round(Number(requestedLocations?.[location]) || 0),
+              ),
+            ),
+          ]),
+        ),
+        locationTotal = Object.values(locationAttendance).reduce(
+          (total, count) => total + count,
+          0,
+        ),
+        attendance = locationTotal || Math.max(
+          0,
+          Math.min(50000, Math.round(Number(req.body?.attendance) || 0)),
+        );
       await db.query(
         `INSERT INTO operations_settings(setting_date,service_attendance,updated_at)
          VALUES((now() AT TIME ZONE 'Europe/London')::date,$1,now())
          ON CONFLICT(setting_date) DO UPDATE SET service_attendance=excluded.service_attendance,updated_at=now()`,
         [attendance],
       );
+      if (requestedLocations && typeof requestedLocations === "object") {
+        for (const [location, count] of Object.entries(locationAttendance)) {
+          if (count > 0)
+            await db.query(
+              `INSERT INTO operations_location_attendance(setting_date,location,attendance,updated_at)
+               VALUES((now() AT TIME ZONE 'Europe/London')::date,$1,$2,now())
+               ON CONFLICT(setting_date,location) DO UPDATE SET attendance=excluded.attendance,updated_at=now()`,
+              [location, count],
+            );
+          else
+            await db.query(
+              `DELETE FROM operations_location_attendance
+               WHERE setting_date=(now() AT TIME ZONE 'Europe/London')::date AND location=$1`,
+              [location],
+            );
+        }
+      }
       await L.audit(
         db,
         null,
         L.hash(L.clientIp(req)),
         "service_attendance_updated",
-        { attendance },
+        { attendance, locationAttendance },
         "saved",
       );
-      return L.json(res, 200, { ok: true, attendance });
+      return L.json(res, 200, { ok: true, attendance, locationAttendance });
     }
     if (action === "operations") {
       await db.query(
@@ -622,6 +656,12 @@ module.exports = async function handler(req, res) {
         targetRows = await db.query(
           `SELECT service_attendance FROM operations_settings
            WHERE setting_date=(now() AT TIME ZONE 'Europe/London')::date`,
+        ),
+        locationAttendanceRows = await db.query(
+          `SELECT location,attendance,updated_at
+           FROM operations_location_attendance
+           WHERE setting_date=(now() AT TIME ZONE 'Europe/London')::date
+           ORDER BY location`,
         ),
         failureRows = await db.query(
           `SELECT count(*)::int AS count FROM audit_events
@@ -661,6 +701,12 @@ module.exports = async function handler(req, res) {
           startedToday: Number(summary?.started_today || 0),
           failedLastHour: Number(failureRows[0]?.count || 0),
           serviceAttendance: Number(targetRows[0]?.service_attendance || 0),
+          locationAttendance: Object.fromEntries(
+            locationAttendanceRows.map((row) => [
+              row.location,
+              Number(row.attendance || 0),
+            ]),
+          ),
         },
         stages: stages.map((row) => ({
           stage: row.stage,

@@ -31,6 +31,33 @@ function number(value) {
   return Number(value || 0);
 }
 
+function aggregateLocations(
+  checkinBreakdown = [],
+  headcountBreakdown = [],
+  locationAttendanceRows = [],
+) {
+  const locations = new Map();
+  for (const row of [
+    ...checkinBreakdown,
+    ...headcountBreakdown,
+    ...locationAttendanceRows,
+  ]) {
+    const key = row.location;
+    const current = locations.get(key) || {
+      location: row.location,
+      identified: 0,
+      roomTotal: 0,
+      enteredAttendance: 0,
+    };
+    if (row.identified != null) current.identified = number(row.identified);
+    if (row.room_total != null) current.roomTotal = number(row.room_total);
+    if (row.attendance != null)
+      current.enteredAttendance = number(row.attendance);
+    locations.set(key, current);
+  }
+  return [...locations.values()];
+}
+
 async function summary(db) {
   const [journey] = await db.query(`
       SELECT
@@ -71,6 +98,12 @@ async function summary(db) {
       FROM attendance_headcounts
       WHERE service_date=(now() AT TIME ZONE 'Europe/London')::date
     `),
+    locationAttendanceRows = await db.query(`
+      SELECT location,attendance,updated_at
+      FROM operations_location_attendance
+      WHERE setting_date=(now() AT TIME ZONE 'Europe/London')::date
+      ORDER BY location
+    `),
     failures = await db.query(`
       SELECT count(*)::int AS count FROM audit_events
       WHERE created_at>now()-interval '60 minutes'
@@ -102,36 +135,26 @@ async function summary(db) {
       GROUP BY journey_type ORDER BY journey_type
     `),
     checkinBreakdown = await db.query(`
-      SELECT location,service_label,count(*)::int AS identified
+      SELECT location,count(*)::int AS identified
       FROM checkin_events
       WHERE service_date=(now() AT TIME ZONE 'Europe/London')::date
-      GROUP BY location,service_label ORDER BY location,service_label
+      GROUP BY location ORDER BY location
     `),
     headcountBreakdown = await db.query(`
-      SELECT location,service_label,
-             (male_count+female_count+children_count)::int AS room_total
+      SELECT location,
+             sum(male_count+female_count+children_count)::int AS room_total
       FROM attendance_headcounts
       WHERE service_date=(now() AT TIME ZONE 'Europe/London')::date
-      ORDER BY location,service_label
+      GROUP BY location ORDER BY location
     `);
 
-  const locations = new Map();
-  for (const row of [...checkinBreakdown, ...headcountBreakdown]) {
-    const key = `${row.location}\u0000${row.service_label}`;
-    const current = locations.get(key) || {
-      location: row.location,
-      service: row.service_label,
-      identified: 0,
-      roomTotal: 0,
-    };
-    if (row.identified != null) current.identified = number(row.identified);
-    if (row.room_total != null) current.roomTotal = number(row.room_total);
-    locations.set(key, current);
-  }
-
   const enteredAttendance = number(targetRows[0]?.service_attendance),
+    locationEnteredAttendance = locationAttendanceRows.reduce(
+      (total, row) => total + number(row.attendance),
+      0,
+    ),
     roomAttendance = number(headcountRows[0]?.total),
-    attendance = roomAttendance || enteredAttendance,
+    attendance = locationEnteredAttendance || roomAttendance || enteredAttendance,
     completed = number(journey?.completed_today);
 
   return {
@@ -140,11 +163,26 @@ async function summary(db) {
     refreshedAt: new Date().toISOString(),
     summary: {
       attendance,
-      attendanceSource: roomAttendance ? "Room headcount" : enteredAttendance ? "Service attendance" : "Not entered",
-      attendanceUpdatedAt: roomAttendance
-        ? headcountRows[0]?.updated_at || null
-        : targetRows[0]?.updated_at || null,
+      attendanceSource: locationEnteredAttendance
+        ? "Location attendance"
+        : roomAttendance
+          ? "Room headcount"
+          : enteredAttendance
+            ? "Service attendance"
+            : "Not entered",
+      attendanceUpdatedAt: locationEnteredAttendance
+        ? locationAttendanceRows.reduce(
+            (latest, row) =>
+              !latest || new Date(row.updated_at) > new Date(latest)
+                ? row.updated_at
+                : latest,
+            null,
+          )
+        : roomAttendance
+          ? headcountRows[0]?.updated_at || null
+          : targetRows[0]?.updated_at || null,
       enteredAttendance,
+      locationEnteredAttendance,
       roomAttendance,
       identifiedCheckins: number(checkinRows[0]?.count),
       startedToday: number(journey?.started_today),
@@ -168,7 +206,11 @@ async function summary(db) {
       started: number(row.started),
       completed: number(row.completed),
     })),
-    locations: [...locations.values()],
+    locations: aggregateLocations(
+      checkinBreakdown,
+      headcountBreakdown,
+      locationAttendanceRows,
+    ),
   };
 }
 
@@ -215,3 +257,5 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+module.exports._aggregateLocations = aggregateLocations;

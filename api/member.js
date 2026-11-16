@@ -7,7 +7,13 @@ const { get: getPrivateBlob } = require("@vercel/blob");
 
 const generic = { ok: true, message: "Continue with the next step." };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const SELECTABLE_GROUP_TYPE_IDS = ["459560", "495375", "511634", "515439"];
+const SELECTABLE_GROUP_TYPE_IDS = [
+  "459560",
+  "495375",
+  "511634",
+  "511638", // Social Media Management
+  "515439",
+];
 const displayGroupName = (value) => {
   const name = String(value || "").trim();
   return /^sol(?:\s+team)?$/i.test(name) ? "Sounds of Liberty" : name;

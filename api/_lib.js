@@ -269,6 +269,13 @@ async function migrateDb() {
     service_attendance integer NOT NULL DEFAULT 0,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await db.query(`CREATE TABLE IF NOT EXISTS operations_location_attendance (
+    setting_date date NOT NULL,
+    location text NOT NULL,
+    attendance integer NOT NULL DEFAULT 0 CHECK (attendance >= 0),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY(setting_date,location)
+  )`);
   await db.query(`CREATE TABLE IF NOT EXISTS pc_group_types (
     id text PRIMARY KEY, name text NOT NULL, position integer, church_center_visible boolean NOT NULL DEFAULT false,
     synced_at timestamptz NOT NULL DEFAULT now()

@@ -86,6 +86,16 @@ const teams = [
   "Outreach",
   "",
 ];
+const OPERATIONS_LOCATIONS = [
+  "Liberty Point Woodford",
+  "North London",
+  "Canary Wharf",
+  "Croydon",
+  "Birmingham",
+  "Lagos",
+  "Houston",
+  "e-TLC",
+];
 const groups = [
   "Northside Connect",
   "Thursday Fellowship",
@@ -985,14 +995,19 @@ function liveOperationsBody() {
   const ops = state.adminData.operations || {},
     summary = ops.summary || {},
     journeys = ops.journeys || [],
-    stages = ops.stages || [];
-  const attendance = Number(summary.serviceAttendance || 0),
+    stages = ops.stages || [],
+    locationAttendance = summary.locationAttendance || {},
+    enteredByLocation = Object.values(locationAttendance).reduce(
+      (total, count) => total + Number(count || 0),
+      0,
+    );
+  const attendance = enteredByLocation || Number(summary.serviceAttendance || 0),
     complete = Number(summary.completedToday || 0);
   const percent = attendance
     ? Math.min(100, Math.round((complete / attendance) * 100))
     : 0;
   return `<section class="ops-dashboard">
-    <div class="ops-toolbar"><div><b>Service progress</b><span>Refreshes automatically every 15 seconds · last checked ${ops.refreshedAt ? relativeAdminTime(ops.refreshedAt) : "just now"}</span></div><form id="attendanceForm"><label>People in service today</label><input id="serviceAttendance" type="number" min="0" max="50000" value="${attendance || ""}" placeholder="e.g. 750"><button class="btn secondary">Save</button></form></div>
+    <div class="ops-toolbar location-attendance-toolbar"><div><b>Attendance by location</b><span>Enter each location’s room count. The media display combines the total and shows the location split.</span><small>Refreshes automatically every 15 seconds · last checked ${ops.refreshedAt ? relativeAdminTime(ops.refreshedAt) : "just now"}</small></div><form id="attendanceForm"><div class="location-attendance-grid">${OPERATIONS_LOCATIONS.map((location) => `<label><span>${esc(location)}</span><input data-attendance-location="${esc(location)}" type="number" min="0" max="50000" value="${Number(locationAttendance[location] || 0) || ""}" placeholder="0"></label>`).join("")}</div><button class="btn secondary">Save attendance</button></form></div>
     <div class="ops-metrics"><article class="live"><span>Active now</span><b>${summary.active || 0}</b><small>seen in the last 5 minutes</small></article><article><span>Completed today</span><b>${complete}</b><small>secure submissions</small></article><article class="${summary.stalled ? "attention" : ""}"><span>May need help</span><b>${summary.stalled || 0}</b><small>over 5 minutes on one step</small></article><article class="${summary.failedLastHour ? "attention" : ""}"><span>Verification issues</span><b>${summary.failedLastHour || 0}</b><small>during the last hour</small></article></div>
     <div class="service-progress"><div><b>${attendance ? `${complete} of ${attendance}` : `${complete} completed`}</b><span>${attendance ? `${percent}% of today’s entered attendance` : "Enter today’s service attendance to compare campaign completion."}</span></div><div class="progress-track"><i style="width:${percent}%"></i></div></div>
     <div class="ops-grid"><section class="ops-panel"><header><div><span class="eyebrow">Live funnel</span><h3>Where people are now</h3></div><small>No names are shown before verification.</small></header><div class="stage-pipeline">${stages.length ? stages.map((stage) => `<article><b>${stage.count}</b><span>${esc(stage.label)}</span></article>`).join("") : `<div class="empty-queue">No active journeys right now.</div>`}</div></section>
@@ -2275,10 +2290,18 @@ function bind() {
     $("#attendanceForm").onsubmit = async (event) => {
       event.preventDefault();
       const button = event.currentTarget.querySelector("button"),
-        attendance = Number($("#serviceAttendance").value || 0);
+        locationAttendance = Object.fromEntries(
+          [...event.currentTarget.querySelectorAll("[data-attendance-location]")].map(
+            (input) => [input.dataset.attendanceLocation, Number(input.value || 0)],
+          ),
+        ),
+        attendance = Object.values(locationAttendance).reduce(
+          (total, count) => total + count,
+          0,
+        );
       button.disabled = true;
       try {
-        await adminApi("operationsTarget", { attendance });
+        await adminApi("operationsTarget", { attendance, locationAttendance });
         await loadAdmin();
         render();
       } catch {

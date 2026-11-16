@@ -956,6 +956,35 @@ td strong {
   min-height: 44px;
   padding: 0 18px;
 }
+.location-attendance-toolbar {
+  align-items: start;
+}
+.location-attendance-toolbar > div small {
+  margin-top: 8px;
+  color: #8794a3;
+}
+.location-attendance-toolbar form {
+  width: min(820px, 68%);
+  grid-template-columns: 1fr auto;
+}
+.location-attendance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(125px, 1fr));
+  gap: 9px;
+}
+.location-attendance-grid label {
+  display: grid;
+  grid-column: auto;
+  gap: 5px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.location-attendance-grid label span {
+  min-height: 25px;
+}
+.location-attendance-grid input {
+  width: 100%;
+}
 .ops-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1489,6 +1518,12 @@ button.people-row:hover { background: #f7fbfe; }
   }
   .ops-toolbar form {
     grid-template-columns: 1fr auto;
+  }
+  .location-attendance-toolbar form {
+    width: 100%;
+  }
+  .location-attendance-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .ops-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
