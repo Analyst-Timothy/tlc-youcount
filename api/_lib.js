@@ -262,6 +262,9 @@ async function migrateDb() {
     completed_at timestamptz
   )`);
   await db.query(
+    `ALTER TABLE journey_presence ADD COLUMN IF NOT EXISTS location text`,
+  );
+  await db.query(
     `CREATE INDEX IF NOT EXISTS journey_presence_live_idx ON journey_presence(status,last_seen_at)`,
   );
   await db.query(`CREATE TABLE IF NOT EXISTS operations_settings (
@@ -276,6 +279,17 @@ async function migrateDb() {
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY(setting_date,location)
   )`);
+  await db.query(`CREATE TABLE IF NOT EXISTS operations_location_completions (
+    completion_key text PRIMARY KEY,
+    completion_date date NOT NULL,
+    location text NOT NULL,
+    journey_type text NOT NULL DEFAULT 'unknown',
+    completed_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS operations_location_completions_date_idx
+     ON operations_location_completions(completion_date,location,completed_at)`,
+  );
   await db.query(`CREATE TABLE IF NOT EXISTS pc_group_types (
     id text PRIMARY KEY, name text NOT NULL, position integer, church_center_visible boolean NOT NULL DEFAULT false,
     synced_at timestamptz NOT NULL DEFAULT now()

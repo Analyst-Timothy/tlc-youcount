@@ -1813,6 +1813,11 @@ function currentJourneyPresence() {
     stageLabel: label,
     formPage,
     blocker,
+    location:
+      state.pendingUpdate?.tlcLocation ||
+      state.formDraft?.tlcLocation ||
+      state.selected?.tlcLocation ||
+      "",
     status: state.step >= 7 ? "completed" : "active",
   };
 }

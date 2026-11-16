@@ -1,5 +1,9 @@
 const root = document.getElementById("serviceDisplay");
-let refreshTimer = null;
+let refreshTimer = null,
+  dashboardDate = new Date().toLocaleDateString("en-CA", {
+    timeZone: "Europe/London",
+  }),
+  dashboardLocation = "all";
 
 const esc = (value) =>
   String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -70,18 +74,18 @@ function render(data) {
     refreshed = new Date(data.refreshedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   root.innerHTML = `<div class="display-shell">
     <div class="colour-ribbon"><i></i><i></i><i></i><i></i><i></i></div>
-    <header class="display-header"><div class="brand-lockup"><img src="/assets/tlc-logo.png" alt="The Liberty Church"><div><span>Sunday pilot</span><b>Live Service</b></div></div><div class="header-actions"><span class="live-state"><i></i>Live · ${esc(refreshed)}</span><button class="icon-button" id="fullscreenDisplay" title="Full screen" aria-label="Open full screen">⛶</button><button class="icon-button" id="displayLogout" title="Log out" aria-label="Log out">×</button></div></header>
+    <header class="display-header"><div class="brand-lockup"><img src="/assets/tlc-logo.png" alt="The Liberty Church"><div><span>Service insights</span><b>Live Service</b></div></div><form class="display-filters" id="displayFilters"><label><span>Date</span><input type="date" id="displayDate" value="${esc(data.date)}" max="${esc(new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }))}"></label><label><span>Location</span><select id="displayLocation"><option value="all">All locations</option>${(data.availableLocations || []).map((location) => `<option value="${esc(location)}" ${data.selectedLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label></form><div class="header-actions"><span class="live-state"><i></i>${data.isToday ? "Live" : "History"} · ${esc(refreshed)}</span><button class="icon-button" id="fullscreenDisplay" title="Full screen" aria-label="Open full screen">⛶</button><button class="icon-button" id="displayLogout" title="Log out" aria-label="Log out">×</button></div></header>
     <main class="display-main">
       <section class="hero-grid">
         <article class="metric-card attendance"><div class="metric-label"><span>People in service</span><i></i></div><div class="metric-value">${summary.attendance || "—"}</div><div class="metric-note">${esc(summary.attendanceSource)}${summary.identifiedCheckins ? ` · <strong>${summary.identifiedCheckins}</strong> identified check-ins` : ""}</div></article>
-        <article class="metric-card"><div class="metric-label">YouCount completed</div><div class="metric-value">${summary.completedToday || 0}</div><div class="metric-note"><strong>${summary.completedLast15 || 0}</strong> in the last 15 minutes</div></article>
-        <article class="metric-card"><div class="metric-label">Active now</div><div class="metric-value">${summary.activeNow || 0}</div><div class="metric-note">currently completing YouCount</div></article>
+        <article class="metric-card"><div class="metric-label">YouCount completed</div><div class="metric-value">${summary.completedToday || 0}</div><div class="metric-note">${data.isToday ? `<strong>${summary.completedLast15 || 0}</strong> in the last 15 minutes` : `<strong>${summary.completionRate || 0}%</strong> of entered attendance`}</div></article>
+        <article class="metric-card"><div class="metric-label">${data.isToday ? "Active now" : "Selected date"}</div><div class="metric-value">${data.isToday ? summary.activeNow || 0 : esc(new Date(`${data.date}T12:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }))}</div><div class="metric-note">${data.isToday ? "currently completing YouCount" : esc(data.selectedLocation === "all" ? "all locations" : data.selectedLocation)}</div></article>
         <article class="metric-card"><div class="metric-label">Average journey</div><div class="metric-value">${summary.averageMinutes || 0}<small class="metric-unit">min</small></div><div class="metric-note">median <strong>${summary.medianMinutes || 0} min</strong></div></article>
       </section>
       <section class="dashboard-grid">
-        <article class="panel"><header><div><span class="eyebrow">Today’s momentum</span><h2>Completions by hour</h2></div><small>${summary.startedToday || 0} journeys started today</small></header>
+        <article class="panel"><header><div><span class="eyebrow">${data.isToday ? "Today’s momentum" : "Selected service day"}</span><h2>Completions by hour</h2></div><small>${summary.startedToday || 0} journeys started</small></header>
           <div class="chart-wrap">${timeline.map((item) => `<div class="chart-column"><b>${item.count || ""}</b><i style="height:${Math.max(2,Math.round((item.count/chartMaximum)*88))}%"></i><span>${esc(item.label.slice(0,2))}</span></div>`).join("")}</div>
-          <div class="insight-strip"><article><b>${summary.startedToday || 0}</b><span>Started today</span></article><article><b>${summary.completedToday || 0}</b><span>Completed today</span></article><article><b>${summary.mayNeedHelp || 0}</b><span>May need help</span></article><article><b>${summary.verificationIssues || 0}</b><span>Issues in last hour</span></article></div>
+          <div class="insight-strip"><article><b>${summary.startedToday || 0}</b><span>Started</span></article><article><b>${summary.completedToday || 0}</b><span>Completed</span></article><article><b>${data.isToday ? summary.mayNeedHelp || 0 : "—"}</b><span>${data.isToday ? "May need help" : "Live support only"}</span></article><article><b>${summary.verificationIssues || 0}</b><span>${data.isToday ? "Issues in last hour" : "Verification issues"}</span></article></div>
         </article>
         <article class="panel"><header><div><span class="eyebrow">Service progress</span><h2>People counted</h2></div><small>${summary.attendance ? `${summary.completedToday || 0} of ${summary.attendance}` : "Awaiting attendance"}</small></header>
           <div class="progress-ring" style="--value:${Math.round((summary.completionRate || 0)*3.6)}deg"><div><b>${summary.completionRate || 0}%</b><span>of attendance</span></div></div>
@@ -90,7 +94,7 @@ function render(data) {
       </section>
       <section class="dashboard-grid">
         <article class="panel"><header><div><span class="eyebrow">Live funnel</span><h2>Where people are now</h2></div><small>Aggregate activity only</small></header><div class="funnel">${(data.stages || []).map((item) => `<div class="funnel-row"><span>${esc(item.label)}</span><div class="funnel-track"><i style="width:${Math.max(4,Math.round((item.count/stageMaximum)*100))}%"></i></div><b>${item.count}</b></div>`).join("") || `<div class="empty">No active journeys right now.</div>`}</div></article>
-        <article class="panel"><header><div><span class="eyebrow">Attendance</span><h2>By location</h2></div><small>${summary.identifiedCheckins || 0} identified</small></header><div class="location-strip">${(data.locations || []).map((item) => { const attendance = item.enteredAttendance || item.roomTotal || item.identified; return `<article class="location-card"><b>${esc(item.location)}</b><span>${item.enteredAttendance ? "Admin attendance" : item.roomTotal ? "Room headcount" : "Identified check-ins"}</span><strong>${attendance}</strong><span>${item.identified ? `${item.identified} identified` : "No identified check-ins yet"}</span></article>`; }).join("") || `<div class="empty">Attendance breakdown will appear after the first location count or check-in.</div>`}</div></article>
+        <article class="panel"><header><div><span class="eyebrow">Attendance</span><h2>By location</h2></div><small>${summary.identifiedCheckins || 0} identified</small></header><div class="location-strip">${(data.locations || []).map((item) => { const attendance = item.enteredAttendance || item.roomTotal || item.identified, rate = attendance ? Math.min(100, Math.round((Number(item.completed || 0) / attendance) * 100)) : 0; return `<article class="location-card"><b>${esc(item.location)}</b><span>${item.enteredAttendance ? "Admin attendance" : item.roomTotal ? "Room headcount" : "Identified check-ins"}</span><strong>${attendance}</strong><span>${item.completed || 0} completed · ${rate}%</span></article>`; }).join("") || `<div class="empty">Attendance breakdown will appear after the first location count or check-in.</div>`}</div></article>
       </section>
     </main>
     <footer class="display-footer"><span>${esc(dateLabel)}</span><span>Read-only aggregate display · no member names or personal details</span></footer>
@@ -98,11 +102,21 @@ function render(data) {
   </div>`;
   document.getElementById("fullscreenDisplay").onclick = () => document.documentElement.requestFullscreen?.();
   document.getElementById("displayLogout").onclick = async () => { await displayApi("logout").catch(() => {}); login(); };
+  document.getElementById("displayFilters").onchange = async () => {
+    dashboardDate = document.getElementById("displayDate").value || dashboardDate;
+    dashboardLocation = document.getElementById("displayLocation").value || "all";
+    await refresh();
+  };
 }
 
 async function refresh() {
   try {
-    render(await displayApi("summary"));
+    render(
+      await displayApi("summary", {
+        date: dashboardDate,
+        location: dashboardLocation,
+      }),
+    );
   } catch (error) {
     if (error.status === 401) return login();
     const state = document.querySelector(".live-state");

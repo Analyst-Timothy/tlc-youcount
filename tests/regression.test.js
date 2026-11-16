@@ -45,12 +45,14 @@ test("location attendance combines inputs without exposing personal fields", () 
         identified: 12,
         roomTotal: 80,
         enteredAttendance: 92,
+        completed: 0,
       },
       {
         location: "Canary Wharf",
         identified: 0,
         roomTotal: 0,
         enteredAttendance: 140,
+        completed: 0,
       },
     ],
   );
@@ -61,8 +63,22 @@ test("location attendance combines inputs without exposing personal fields", () 
 test("media display remains aggregate-only and location based", () => {
   const display = source("service-display.js");
   assert.match(display, /<h2>By location<\/h2>/);
+  assert.match(display, /id="displayLocation"/);
+  assert.match(display, /id="displayDate"/);
   assert.match(display, /item\.enteredAttendance \|\| item\.roomTotal \|\| item\.identified/);
   assert.doesNotMatch(display, /displayName|publicId|photoRecordId/);
+});
+
+test("completion analytics store anonymous location aggregates", () => {
+  const member = source("api/member.js");
+  const schema = source("api/_lib.js");
+  assert.match(schema, /operations_location_completions/);
+  assert.match(member, /location-completion:/);
+  assert.match(member, /canonicalTlcLocation/);
+  assert.doesNotMatch(
+    schema.match(/CREATE TABLE IF NOT EXISTS operations_location_completions[\s\S]*?\)`/)[0],
+    /name|email|phone|public_id/i,
+  );
 });
 
 test("admin attendance saves a location map", () => {

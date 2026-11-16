@@ -18,6 +18,22 @@ const displayGroupName = (value) => {
   const name = String(value || "").trim();
   return /^sol(?:\s+team)?$/i.test(name) ? "Sounds of Liberty" : name;
 };
+const TLC_ANALYTICS_LOCATIONS = new Set([
+  "Liberty Point Woodford",
+  "North London",
+  "Canary Wharf",
+  "Croydon",
+  "Birmingham",
+  "Lagos",
+  "Houston",
+  "e-TLC",
+]);
+const canonicalTlcLocation = (value) => {
+  const location = String(value || "").trim();
+  if (location === "Woodford") return "Liberty Point Woodford";
+  if (location === "Other / online") return "e-TLC";
+  return TLC_ANALYTICS_LOCATIONS.has(location) ? location : "";
+};
 const UK_POSTCODE = /^(GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
 const cleanAddressPostcode = (value) => {
   const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -1704,7 +1720,8 @@ module.exports = async function handler(req, res) {
         blocker = String(req.body?.blocker || "").trim().slice(0, 120) || null,
         formPage = [1, 2, 3].includes(Number(req.body?.formPage))
           ? Number(req.body.formPage)
-          : null;
+          : null,
+        location = canonicalTlcLocation(req.body?.location) || null;
       if (!/^[a-zA-Z0-9_-]{16,100}$/.test(journeyId) || !allowedStages.has(stage) || !stageLabel)
         return L.json(res, 400, { ok: false });
       if (!(await L.consumeRate(db, "journey_presence", journeyHash, 180, 15)))
@@ -1720,17 +1737,18 @@ module.exports = async function handler(req, res) {
       }
       await db.query(
         `INSERT INTO journey_presence(
-          journey_hash,session_id,journey_type,stage,stage_label,form_page,status,blocker,
+          journey_hash,session_id,journey_type,stage,stage_label,form_page,status,blocker,location,
           completed_at
-        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,CASE WHEN $7='completed' THEN now() ELSE NULL END)
+        ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,CASE WHEN $7='completed' THEN now() ELSE NULL END)
         ON CONFLICT(journey_hash) DO UPDATE SET
           session_id=COALESCE(excluded.session_id,journey_presence.session_id),
           journey_type=excluded.journey_type,
+          location=COALESCE(excluded.location,journey_presence.location),
           stage_entered_at=CASE WHEN journey_presence.stage<>excluded.stage THEN now() ELSE journey_presence.stage_entered_at END,
           stage=excluded.stage,stage_label=excluded.stage_label,form_page=excluded.form_page,
           status=excluded.status,blocker=excluded.blocker,last_seen_at=now(),
           completed_at=CASE WHEN excluded.status='completed' THEN COALESCE(journey_presence.completed_at,now()) ELSE journey_presence.completed_at END`,
-        [journeyHash, sessionId, journeyType, stage, stageLabel, formPage, status, blocker],
+        [journeyHash, sessionId, journeyType, stage, stageLabel, formPage, status, blocker, location],
       );
       return L.json(res, 200, { ok: true });
     }
@@ -2657,6 +2675,9 @@ module.exports = async function handler(req, res) {
       // are not blocked by data they can no longer select or correct.
       if (changes.attendanceFrequency === "More than once a week")
         changes.attendanceFrequency = "Weekly";
+      if (changes.tlcLocation)
+        changes.tlcLocation =
+          canonicalTlcLocation(changes.tlcLocation) || changes.tlcLocation;
       const permittedGender = new Set(["Male", "Female", "Prefer not to say"]),
         permittedEthnicityCodes = new Set([
           "A1", "A2", "A3", "A4", "A5",
@@ -2793,6 +2814,21 @@ module.exports = async function handler(req, res) {
           subjectHash,
         ],
       );
+      const analyticsLocation = canonicalTlcLocation(changes.tlcLocation);
+      if (analyticsLocation)
+        await db.query(
+          `INSERT INTO operations_location_completions(
+             completion_key,completion_date,location,journey_type,completed_at
+           ) VALUES($1,(now() AT TIME ZONE 'Europe/London')::date,$2,$3,now())
+           ON CONFLICT(completion_key) DO UPDATE SET
+             completion_date=excluded.completion_date,location=excluded.location,
+             journey_type=excluded.journey_type,completed_at=excluded.completed_at`,
+          [
+            L.hash(`location-completion:${s.id}`),
+            analyticsLocation,
+            String(changes.membershipStatus || "unknown").slice(0, 30),
+          ],
+        );
       await L.audit(
         db,
         s.id,
