@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "test:syntax": "node --check app.js && node --check api/member.js && node --check api/admin.js && node --check api/service-display.js && node --check service-display.js",
+    "test:syntax": "node --check app.js && node --check check-in.js && node --check checkin-handler.js && node --check api/member.js && node --check api/admin.js && node --check api/service-display.js && node --check service-display.js",
     "test:journeys": "playwright test"
   },
   "dependencies": {

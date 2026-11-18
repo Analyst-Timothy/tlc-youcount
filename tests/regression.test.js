@@ -99,3 +99,52 @@ test("Woodford uses one canonical location name", () => {
     /WHEN location='Woodford' THEN 'Liberty Point Woodford'/,
   );
 });
+
+test("TED attendance keeps three readings and calculates the rounded average", () => {
+  const checkin = require("../checkin-handler");
+  assert.deepEqual(checkin._defaultServices, [
+    { name: "First Sunday Service", startsAt: "09:00" },
+    { name: "Second Sunday Service", startsAt: "11:30" },
+  ]);
+  assert.equal(checkin._canonicalLocation("Woodford"), "Liberty Point Woodford");
+  assert.deepEqual(
+    checkin._readingSummary([
+      { id: 1, reading_number: 1, male_count: 100, female_count: 120, children_count: 30, unassigned_count: 0 },
+      { id: 2, reading_number: 2, male_count: 105, female_count: 125, children_count: 35, unassigned_count: 0 },
+      { id: 3, reading_number: 3, male_count: 98, female_count: 122, children_count: 32, unassigned_count: 0 },
+    ]),
+    {
+      readings: [
+        { id: 1, reading: 1, male: 100, female: 120, children: 30, unassigned: 0, total: 250, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 2, reading: 2, male: 105, female: 125, children: 35, unassigned: 0, total: 265, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 3, reading: 3, male: 98, female: 122, children: 32, unassigned: 0, total: 252, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+      ],
+      official: 256,
+      provisional: false,
+      lowest: 250,
+      highest: 265,
+      spread: 15,
+    },
+  );
+});
+
+test("attendance events connect scans, counts, dashboards and imports", () => {
+  const schema = source("api/_lib.js"),
+    handler = source("checkin-handler.js"),
+    checkinUi = source("check-in.js"),
+    displayApi = source("api/service-display.js"),
+    displayUi = source("service-display.js");
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS attendance_events/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS attendance_headcount_readings/);
+  assert.match(schema, /reading_number smallint NOT NULL CHECK \(reading_number BETWEEN 1 AND 3\)/);
+  assert.match(schema, /ALTER TABLE checkin_events ADD COLUMN IF NOT EXISTS attendance_event_id/);
+  assert.match(handler, /action === "createEvent"/);
+  assert.match(handler, /action === "importPlanningCenter"/);
+  assert.match(handler, /action === "importHistory"/);
+  assert.match(handler, /attendance_event_id\n\s*\)/);
+  assert.match(checkinUi, /Count \$\{number\}/);
+  assert.match(checkinUi, /Import Planning Center/);
+  assert.match(checkinUi, /Import history CSV/);
+  assert.match(displayApi, /availableEvents/);
+  assert.match(displayUi, /id="displayEvent"/);
+});

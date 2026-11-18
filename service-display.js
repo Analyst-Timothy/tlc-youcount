@@ -3,7 +3,8 @@ let refreshTimer = null,
   dashboardDate = new Date().toLocaleDateString("en-CA", {
     timeZone: "Europe/London",
   }),
-  dashboardLocation = "all";
+  dashboardLocation = "all",
+  dashboardEventId = "all";
 
 const esc = (value) =>
   String(value ?? "").replace(/[&<>'"]/g, (character) => ({
@@ -74,7 +75,7 @@ function render(data) {
     refreshed = new Date(data.refreshedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   root.innerHTML = `<div class="display-shell">
     <div class="colour-ribbon"><i></i><i></i><i></i><i></i><i></i></div>
-    <header class="display-header"><div class="brand-lockup"><img src="/assets/tlc-logo.png" alt="The Liberty Church"><div><span>Service insights</span><b>Live Service</b></div></div><form class="display-filters" id="displayFilters"><label><span>Date</span><input type="date" id="displayDate" value="${esc(data.date)}" max="${esc(new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }))}"></label><label><span>Location</span><select id="displayLocation"><option value="all">All locations</option>${(data.availableLocations || []).map((location) => `<option value="${esc(location)}" ${data.selectedLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label></form><div class="header-actions"><span class="live-state"><i></i>${data.isToday ? "Live" : "History"} · ${esc(refreshed)}</span><button class="icon-button" id="fullscreenDisplay" title="Full screen" aria-label="Open full screen">⛶</button><button class="icon-button" id="displayLogout" title="Log out" aria-label="Log out">×</button></div></header>
+    <header class="display-header"><div class="brand-lockup"><img src="/assets/tlc-logo.png" alt="The Liberty Church"><div><span>Service insights</span><b>Live Service</b></div></div><form class="display-filters" id="displayFilters"><label><span>Date</span><input type="date" id="displayDate" value="${esc(data.date)}" max="${esc(new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }))}"></label><label><span>Location</span><select id="displayLocation"><option value="all">All locations</option>${(data.availableLocations || []).map((location) => `<option value="${esc(location)}" ${data.selectedLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label><label><span>Service / event</span><select id="displayEvent"><option value="all">All services</option>${(data.availableEvents || []).map((event) => `<option value="${event.id}" ${Number(data.selectedEventId) === Number(event.id) ? "selected" : ""}>${event.startsAt ? `${esc(event.startsAt)} · ` : ""}${esc(event.name)}${data.selectedLocation === "all" ? ` · ${esc(event.location)}` : ""}</option>`).join("")}</select></label></form><div class="header-actions"><span class="live-state"><i></i>${data.isToday ? "Live" : "History"} · ${esc(refreshed)}</span><button class="icon-button" id="fullscreenDisplay" title="Full screen" aria-label="Open full screen">⛶</button><button class="icon-button" id="displayLogout" title="Log out">×</button></div></header>
     <main class="display-main">
       <section class="hero-grid">
         <article class="metric-card attendance"><div class="metric-label"><span>People in service</span><i></i></div><div class="metric-value">${summary.attendance || "—"}</div><div class="metric-note">${esc(summary.attendanceSource)}${summary.identifiedCheckins ? ` · <strong>${summary.identifiedCheckins}</strong> identified check-ins` : ""}</div></article>
@@ -94,7 +95,7 @@ function render(data) {
       </section>
       <section class="dashboard-grid">
         <article class="panel"><header><div><span class="eyebrow">Live funnel</span><h2>Where people are now</h2></div><small>Aggregate activity only</small></header><div class="funnel">${(data.stages || []).map((item) => `<div class="funnel-row"><span>${esc(item.label)}</span><div class="funnel-track"><i style="width:${Math.max(4,Math.round((item.count/stageMaximum)*100))}%"></i></div><b>${item.count}</b></div>`).join("") || `<div class="empty">No active journeys right now.</div>`}</div></article>
-        <article class="panel"><header><div><span class="eyebrow">Attendance</span><h2>By location</h2></div><small>${summary.identifiedCheckins || 0} identified</small></header><div class="location-strip">${(data.locations || []).map((item) => { const attendance = item.enteredAttendance || item.roomTotal || item.identified, rate = attendance ? Math.min(100, Math.round((Number(item.completed || 0) / attendance) * 100)) : 0; return `<article class="location-card"><b>${esc(item.location)}</b><span>${item.enteredAttendance ? "Admin attendance" : item.roomTotal ? "Room headcount" : "Identified check-ins"}</span><strong>${attendance}</strong><span>${item.completed || 0} completed · ${rate}%</span></article>`; }).join("") || `<div class="empty">Attendance breakdown will appear after the first location count or check-in.</div>`}</div></article>
+        <article class="panel"><header><div><span class="eyebrow">Attendance</span><h2>By location</h2></div><small>${summary.identifiedCheckins || 0} identified</small></header><div class="location-strip">${(data.locations || []).map((item) => { const attendance = item.enteredAttendance || item.roomTotal || item.identified, rate = attendance ? Math.min(100, Math.round((Number(item.completed || 0) / attendance) * 100)) : 0; return `<article class="location-card"><b>${esc(item.location)}</b><span>${item.enteredAttendance ? "Admin attendance" : item.roomTotal ? "TED count average" : "Identified check-ins"}</span><strong>${attendance}</strong><span>${item.completed || 0} completed · ${rate}%</span></article>`; }).join("") || `<div class="empty">Attendance breakdown will appear after the first location count or check-in.</div>`}</div></article>
       </section>
     </main>
     <footer class="display-footer"><span>${esc(dateLabel)}</span><span>Read-only aggregate display · no member names or personal details</span></footer>
@@ -102,9 +103,15 @@ function render(data) {
   </div>`;
   document.getElementById("fullscreenDisplay").onclick = () => document.documentElement.requestFullscreen?.();
   document.getElementById("displayLogout").onclick = async () => { await displayApi("logout").catch(() => {}); login(); };
-  document.getElementById("displayFilters").onchange = async () => {
-    dashboardDate = document.getElementById("displayDate").value || dashboardDate;
-    dashboardLocation = document.getElementById("displayLocation").value || "all";
+  document.getElementById("displayFilters").onchange = async (event) => {
+    const nextDate = document.getElementById("displayDate").value || dashboardDate,
+      nextLocation = document.getElementById("displayLocation").value || "all";
+    const eventChanged = event.target?.id === "displayEvent";
+    dashboardDate = nextDate;
+    dashboardLocation = nextLocation;
+    dashboardEventId = eventChanged
+      ? document.getElementById("displayEvent").value || "all"
+      : "all";
     await refresh();
   };
 }
@@ -115,6 +122,7 @@ async function refresh() {
       await displayApi("summary", {
         date: dashboardDate,
         location: dashboardLocation,
+        eventId: dashboardEventId,
       }),
     );
   } catch (error) {

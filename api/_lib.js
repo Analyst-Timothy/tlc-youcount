@@ -351,6 +351,32 @@ async function migrateDb() {
     value text NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now()
   )`);
+  await db.query(`CREATE TABLE IF NOT EXISTS attendance_events (
+    id bigserial PRIMARY KEY,
+    event_date date NOT NULL,
+    location text NOT NULL,
+    name text NOT NULL,
+    starts_at time,
+    ends_at time,
+    event_type text NOT NULL DEFAULT 'service',
+    source text NOT NULL DEFAULT 'local',
+    external_app text,
+    external_id text,
+    status text NOT NULL DEFAULT 'planned',
+    created_by text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(event_date,location,name)
+  )`);
+  await db.query(
+    `CREATE UNIQUE INDEX IF NOT EXISTS attendance_events_external_idx
+     ON attendance_events(external_app,external_id,location)
+     WHERE external_app IS NOT NULL AND external_id IS NOT NULL`,
+  );
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS attendance_events_date_location_idx
+     ON attendance_events(event_date,location,starts_at,name)`,
+  );
   await db.query(`CREATE TABLE IF NOT EXISTS checkin_events (
     id bigserial PRIMARY KEY,
     identity_id bigint NOT NULL REFERENCES tlc_identities(id) ON DELETE RESTRICT,
@@ -373,6 +399,14 @@ async function migrateDb() {
     `CREATE INDEX IF NOT EXISTS checkin_events_live_idx
      ON checkin_events(service_date,location,service_label,checked_in_at DESC)`,
   );
+  await db.query(
+    `ALTER TABLE checkin_events ADD COLUMN IF NOT EXISTS attendance_event_id bigint
+     REFERENCES attendance_events(id) ON DELETE SET NULL`,
+  );
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS checkin_events_attendance_event_idx
+     ON checkin_events(attendance_event_id,checked_in_at DESC)`,
+  );
   await db.query(`CREATE TABLE IF NOT EXISTS attendance_headcounts (
     id bigserial PRIMARY KEY,
     service_date date NOT NULL,
@@ -391,6 +425,59 @@ async function migrateDb() {
     `CREATE INDEX IF NOT EXISTS attendance_headcounts_service_idx
      ON attendance_headcounts(service_date,location,service_label)`,
   );
+  await db.query(`CREATE TABLE IF NOT EXISTS attendance_headcount_readings (
+    id bigserial PRIMARY KEY,
+    attendance_event_id bigint NOT NULL REFERENCES attendance_events(id) ON DELETE CASCADE,
+    reading_number smallint NOT NULL CHECK (reading_number BETWEEN 1 AND 3),
+    male_count integer NOT NULL DEFAULT 0 CHECK (male_count >= 0),
+    female_count integer NOT NULL DEFAULT 0 CHECK (female_count >= 0),
+    children_count integer NOT NULL DEFAULT 0 CHECK (children_count >= 0),
+    unassigned_count integer NOT NULL DEFAULT 0 CHECK (unassigned_count >= 0),
+    notes text,
+    device_label text,
+    recorded_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(attendance_event_id,reading_number)
+  )`);
+  await db.query(
+    `ALTER TABLE attendance_headcount_readings
+     ADD COLUMN IF NOT EXISTS unassigned_count integer NOT NULL DEFAULT 0 CHECK (unassigned_count >= 0)`,
+  );
+  await db.query(
+    `CREATE INDEX IF NOT EXISTS attendance_headcount_readings_event_idx
+     ON attendance_headcount_readings(attendance_event_id,reading_number)`,
+  );
+  // Preserve every legacy room count as the first reading of a matching event.
+  // This migration is idempotent and leaves the old table available during rollout.
+  await db.query(`
+    INSERT INTO attendance_events(event_date,location,name,source,status,created_by)
+    SELECT DISTINCT service_date,
+      CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END,
+      service_label,'legacy','closed','legacy migration'
+    FROM attendance_headcounts
+    ON CONFLICT(event_date,location,name) DO NOTHING
+  `);
+  await db.query(`
+    INSERT INTO attendance_headcount_readings(
+      attendance_event_id,reading_number,male_count,female_count,children_count,unassigned_count,
+      notes,device_label,recorded_at,updated_at
+    )
+    SELECT e.id,1,h.male_count,h.female_count,h.children_count,0,
+      h.notes,h.device_label,h.created_at,h.updated_at
+    FROM attendance_headcounts h
+    JOIN attendance_events e ON e.event_date=h.service_date
+      AND e.location=CASE WHEN h.location='Woodford' THEN 'Liberty Point Woodford' ELSE h.location END
+      AND e.name=h.service_label
+    ON CONFLICT(attendance_event_id,reading_number) DO NOTHING
+  `);
+  await db.query(`
+    UPDATE checkin_events c SET attendance_event_id=e.id
+    FROM attendance_events e
+    WHERE c.attendance_event_id IS NULL
+      AND e.event_date=c.service_date
+      AND e.location=CASE WHEN c.location='Woodford' THEN 'Liberty Point Woodford' ELSE c.location END
+      AND e.name=c.service_label
+  `);
   await db.query(`CREATE TABLE IF NOT EXISTS pastoral_cases (
     id bigserial PRIMARY KEY,
     identity_id bigint NOT NULL REFERENCES tlc_identities(id) ON DELETE RESTRICT,

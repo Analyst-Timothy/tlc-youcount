@@ -24,8 +24,33 @@ h1 { font-size:38px; margin:8px 0; color:var(--navy); font-weight:800; letter-sp
 .scanner-app main { width:min(1050px,100%); margin:auto; padding:22px; display:grid; grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr); gap:20px; }
 .service-settings { grid-column:1/-1; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; background:#fff; padding:16px; border-radius:16px; }
 .service-settings label { display:grid; gap:6px; color:var(--muted); font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.08em; }
+.event-actions { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:9px; padding-top:4px; }
+.event-actions button,.file-action,.event-actions a { position:relative; overflow:hidden; border:1px solid #b9ccdc; border-radius:999px; padding:10px 14px; background:#f5f9fc; color:var(--navy); font-size:11px; font-weight:900; text-transform:none; letter-spacing:0; text-decoration:none; cursor:pointer; }
+.file-action input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.event-message { grid-column:1/-1; margin:0; padding:10px 12px; border-radius:10px; background:#edf5fb; color:var(--blue); font-size:12px; font-weight:700; }
+.event-creator { grid-column:1/-1; display:grid; grid-template-columns:minmax(180px,.45fr) minmax(0,1.55fr); gap:18px; padding:18px; border:1px solid #d7e2eb; border-radius:16px; background:#fff; box-shadow:0 12px 35px #123b6012; }
+.event-creator h2 { margin:5px 0 0; color:var(--navy); }
+.event-creator form { display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto auto; gap:10px; align-items:end; }
+.event-creator label { display:grid; gap:5px; color:var(--muted); font-size:11px; font-weight:800; }
+.event-creator input,.event-creator select { width:100%; min-width:0; border:1px solid #cbd8e4; border-radius:10px; padding:11px; color:var(--navy); background:#fff; }
+.event-creator button { border:0; border-radius:10px; padding:12px; background:var(--pink); color:#fff; font-weight:900; }
+.event-creator button.quiet { border:1px solid #cbd8e4; background:#fff; color:var(--navy); }
 .camera-card,.recent { background:#fff; padding:18px; border-radius:20px; box-shadow:0 12px 35px #123b6012; }
 .attendance-panel { display:grid; align-content:start; gap:18px; padding:20px; border-radius:20px; color:var(--navy); background:linear-gradient(155deg,#fff 0%,#f0f6fb 100%); box-shadow:0 12px 35px #123b6012; }
+.attendance-heading { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.attendance-heading em { border-radius:999px; padding:6px 9px; font-size:9px; font-style:normal; font-weight:900; text-transform:uppercase; letter-spacing:.06em; }
+.attendance-heading .provisional { color:#865900; background:#fff1c8; }
+.attendance-heading .complete { color:#08704e; background:#dff5ea; }
+.selected-service { display:grid; gap:3px; margin-bottom:14px; }
+.selected-service b { color:var(--navy); font-size:20px; }
+.selected-service small { color:var(--muted); }
+.reading-tabs { display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.reading-tabs button { display:grid; gap:2px; min-width:0; border:1px solid #cbd8e4; border-radius:11px; padding:9px 7px; background:#fff; color:var(--navy); text-align:left; }
+.reading-tabs button.active { border-color:var(--pink); box-shadow:0 0 0 2px #ec168c24; }
+.reading-tabs button.saved { background:#eef8f4; }
+.reading-tabs span,.reading-tabs small { overflow:hidden; text-overflow:ellipsis; color:var(--muted); font-size:9px; white-space:nowrap; }
+.reading-tabs b { font-size:20px; }
+.variance-warning { padding:10px; border-radius:10px; background:#fff1c8; color:#765000; font-size:11px; font-weight:800; line-height:1.45; }
 .attendance-total { display:flex; align-items:center; gap:14px; padding-bottom:16px; border-bottom:1px solid #dbe5ed; }
 .attendance-total b { font-size:50px; line-height:1; }
 .attendance-total span { color:var(--muted); font-size:12px; line-height:1.5; }
@@ -82,6 +107,8 @@ h1 { font-size:38px; margin:8px 0; color:var(--navy); font-weight:800; letter-sp
   .wordmark { width:160px; }
   .scanner-app main { grid-template-columns:1fr; padding:12px; }
   .service-settings { grid-template-columns:1fr 1fr; }
+  .event-creator { grid-template-columns:1fr; }
+  .event-creator form { grid-template-columns:1fr 1fr; }
   .camera-card,.recent { padding:12px; border-radius:15px; }
   .camera-frame { min-height:min(56vh,480px); }
 }
@@ -89,6 +116,7 @@ h1 { font-size:38px; margin:8px 0; color:var(--navy); font-weight:800; letter-sp
   .login-screen { place-items:end center; padding:82px 16px 24px; background-position:65% center; }
   .login-card { padding:26px 22px; }
   .service-settings { grid-template-columns:1fr; }
+  .event-creator form { grid-template-columns:1fr; }
   #manualScan { grid-template-columns:1fr; }
 }
 @media(max-height:520px) and (orientation:landscape) {

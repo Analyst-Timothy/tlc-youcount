@@ -53,6 +53,10 @@ const selectedDate = (value) => {
 };
 const selectedLocation = (value) =>
   DISPLAY_LOCATIONS.includes(String(value || "")) ? String(value) : "";
+const selectedEventId = (value) => {
+  const id = Number(value || 0);
+  return Number.isSafeInteger(id) && id > 0 ? id : 0;
+};
 
 function aggregateLocations(
   checkinBreakdown = [],
@@ -88,6 +92,7 @@ function aggregateLocations(
 async function summary(db, options = {}) {
   const date = selectedDate(options.date),
     location = selectedLocation(options.location),
+    eventId = selectedEventId(options.eventId),
     today = londonDate();
   const [journey] = await db.query(`
       SELECT
@@ -129,19 +134,40 @@ async function summary(db, options = {}) {
       SELECT count(*)::int AS count FROM checkin_events
       WHERE service_date=$1::date AND ($2='' OR
         CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END=$2)
-    `, [date, location]),
+        AND ($3::bigint=0 OR attendance_event_id=$3)
+    `, [date, location, eventId]),
     headcountRows = await db.query(`
-      SELECT coalesce(sum(male_count+female_count+children_count),0)::int AS total,
-             max(updated_at) AS updated_at
-      FROM attendance_headcounts
-      WHERE service_date=$1::date AND ($2='' OR
-        CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END=$2)
-    `, [date, location]),
+      WITH reading_totals AS (
+        SELECT r.attendance_event_id,r.reading_number,
+               sum(r.male_count+r.female_count+r.children_count+r.unassigned_count)::numeric AS total,
+               max(r.updated_at) AS updated_at
+        FROM attendance_headcount_readings r
+        JOIN attendance_events e ON e.id=r.attendance_event_id
+        WHERE e.event_date=$1::date AND ($2='' OR e.location=$2)
+          AND ($3::bigint=0 OR e.id=$3)
+        GROUP BY r.attendance_event_id,r.reading_number
+      ), event_averages AS (
+        SELECT attendance_event_id,round(avg(total))::int AS official,
+               count(*)::int AS reading_count,max(updated_at) AS updated_at
+        FROM reading_totals GROUP BY attendance_event_id
+      )
+      SELECT coalesce(sum(official),0)::int AS total,max(updated_at) AS updated_at,
+             coalesce(sum(reading_count),0)::int AS reading_count,
+             count(*)::int AS event_count,
+             count(*) FILTER (WHERE reading_count=3)::int AS complete_events
+      FROM event_averages
+    `, [date, location, eventId]),
     locationAttendanceRows = await db.query(`
       SELECT location,attendance,updated_at
       FROM operations_location_attendance
-      WHERE setting_date=$1::date AND ($2='' OR location=$2)
+      WHERE setting_date=$1::date AND ($2='' OR location=$2) AND $3::bigint=0
       ORDER BY location
+    `, [date, location, eventId]),
+    availableEvents = await db.query(`
+      SELECT id,name,location,starts_at,event_type,source,status
+      FROM attendance_events
+      WHERE event_date=$1::date AND ($2='' OR location=$2)
+      ORDER BY starts_at NULLS LAST,name,location
     `, [date, location]),
     failures = await db.query(`
       SELECT count(*)::int AS count FROM audit_events
@@ -185,16 +211,25 @@ async function summary(db, options = {}) {
       FROM checkin_events
       WHERE service_date=$1::date AND ($2='' OR
         CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END=$2)
+        AND ($3::bigint=0 OR attendance_event_id=$3)
       GROUP BY 1 ORDER BY 1
-    `, [date, location]),
+    `, [date, location, eventId]),
     headcountBreakdown = await db.query(`
-      SELECT CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END AS location,
-             sum(male_count+female_count+children_count)::int AS room_total
-      FROM attendance_headcounts
-      WHERE service_date=$1::date AND ($2='' OR
-        CASE WHEN location='Woodford' THEN 'Liberty Point Woodford' ELSE location END=$2)
-      GROUP BY 1 ORDER BY 1
-    `, [date, location]),
+      WITH reading_totals AS (
+        SELECT e.id,e.location,r.reading_number,
+               sum(r.male_count+r.female_count+r.children_count+r.unassigned_count)::numeric AS total
+        FROM attendance_events e
+        JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
+        WHERE e.event_date=$1::date AND ($2='' OR e.location=$2)
+          AND ($3::bigint=0 OR e.id=$3)
+        GROUP BY e.id,e.location,r.reading_number
+      ), event_averages AS (
+        SELECT id,location,round(avg(total))::int AS official
+        FROM reading_totals GROUP BY id,location
+      )
+      SELECT location,sum(official)::int AS room_total
+      FROM event_averages GROUP BY location ORDER BY location
+    `, [date, location, eventId]),
     completionBreakdown = await db.query(`
       SELECT location,count(*)::int AS completed
       FROM operations_location_completions
@@ -215,6 +250,16 @@ async function summary(db, options = {}) {
     ok: true,
     date,
     selectedLocation: location || "all",
+    selectedEventId: eventId || "all",
+    availableEvents: availableEvents.map((row) => ({
+      id: Number(row.id),
+      name: row.name,
+      location: row.location,
+      startsAt: row.starts_at ? String(row.starts_at).slice(0, 5) : "",
+      eventType: row.event_type,
+      source: row.source,
+      status: row.status,
+    })),
     availableLocations: DISPLAY_LOCATIONS,
     isToday: date === today,
     refreshedAt: new Date().toISOString(),
@@ -223,7 +268,9 @@ async function summary(db, options = {}) {
       attendanceSource: locationEnteredAttendance
         ? "Location attendance"
         : roomAttendance
-          ? "Room headcount"
+          ? Number(headcountRows[0]?.event_count || 0) === 1
+            ? `TED average · ${number(headcountRows[0]?.reading_count)}/3 counts`
+            : `TED averages · ${number(headcountRows[0]?.complete_events)}/${number(headcountRows[0]?.event_count)} services complete`
           : enteredAttendance
             ? "Service attendance"
             : "Not entered",
@@ -279,7 +326,7 @@ module.exports = async function handler(req, res) {
     const action = String(req.body?.action || ""),
       ipHash = L.hash(L.clientIp(req));
     if (action === "login") {
-      const db = await L.initDb(),
+      const db = await L.migrateDb(),
         submitted = String(req.body?.pin || "");
       if (!(await L.consumeRate(db, "service_display_login", ipHash, 10, 30)))
         return L.json(res, 429, { ok: false, message: "Too many attempts. Ask the service lead for access." });
