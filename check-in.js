@@ -15,6 +15,8 @@ const state = {
   headcounts: [],
   headcountSummary: { readings: [], official: 0, provisional: true, spread: 0 },
   selectedReading: 1,
+  workspaceTab: localStorage.getItem("tlc_attendance_tab") || "checkin",
+  eventType: "all",
   showCreateEvent: false,
   importMessage: "",
   result: null,
@@ -22,6 +24,12 @@ const state = {
   scanning: false,
   busy: false,
   date: todayInLondon(),
+};
+const eventTypeLabels = {
+  sunday_service: "Sunday service",
+  service: "Church service",
+  conference: "Conference",
+  event: "Other event",
 };
 const esc = (value) =>
   String(value || "")
@@ -165,27 +173,45 @@ function render() {
     countSummary = state.headcountSummary || {},
     readings = countSummary.readings || state.headcounts,
     varianceWarning = readings.length > 1 && countSummary.official && countSummary.spread / countSummary.official > 0.1;
-  root.innerHTML = `<div class="scanner-app"><header>${wordmark()}<div><span>${live ? "Identified in this service" : "Selected service"}</span><b>${state.total}</b><button id="logout" aria-label="Log out">×</button></div></header><main>
+  const visibleEvents = state.eventType === "all"
+      ? state.events
+      : state.events.filter((event) => (event.eventType || "service") === state.eventType),
+    tabs = [
+      ["checkin", "Check-in", "Scan cards"],
+      ["counts", "Counts", "Record headcounts"],
+      ["events", "Events & imports", "Set up services"],
+      ["history", "History", "Review arrivals"],
+    ];
+  root.innerHTML = `<div class="scanner-app"><header>${wordmark()}<div><span>${live ? "Identified in this service" : "Selected service"}</span><b>${state.total}</b><button id="logout" aria-label="Log out">×</button></div></header><main class="crm-layout">
+    <aside class="crm-sidebar"><span class="kicker">Attendance CRM</span><nav>${tabs.map(([id, label, description]) => `<button type="button" data-workspace-tab="${id}" class="${state.workspaceTab === id ? "active" : ""}"><b>${label}</b><small>${description}</small></button>`).join("")}</nav><p>TED attendance workspace</p></aside><section class="crm-content">
     <section class="service-settings">
-      <label>Calendar date<input id="historyDate" type="date" max="${todayInLondon()}" value="${esc(state.date)}"></label>
+      <label>Calendar date<input id="historyDate" type="date" value="${esc(state.date)}"></label>
       <label>Location<select id="location">${state.locations.map((location) => `<option ${location === state.location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label>
-      <label>Service or event<select id="service">${state.events.map((event) => `<option value="${event.id}" ${Number(event.id) === state.eventId ? "selected" : ""}>${event.startsAt ? `${esc(event.startsAt)} · ` : ""}${esc(event.name)}</option>`).join("")}</select></label>
-      <div class="event-actions"><button type="button" id="toggleCreateEvent">+ Create event</button><button type="button" id="importPlanningCenter">Import Planning Center</button><label class="file-action">Import history CSV<input id="historyImport" type="file" accept=".csv,text/csv"></label><a href="/attendance-history-template.csv" download>Download CSV template</a></div>
-      ${state.importMessage ? `<p class="event-message" role="status">${esc(state.importMessage)}</p>` : ""}
+      <label>Service type<select id="serviceType"><option value="all">All service types</option>${Object.entries(eventTypeLabels).map(([value, label]) => `<option value="${value}" ${state.eventType === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
+      <label>Service or event<select id="service">${visibleEvents.map((event) => `<option value="${event.id}" ${Number(event.id) === state.eventId ? "selected" : ""}>${event.startsAt ? `${esc(event.startsAt)} · ` : ""}${esc(event.name)} · ${esc(eventTypeLabels[event.eventType] || "Church service")}</option>`).join("")}</select></label>
     </section>
-    ${state.showCreateEvent ? `<section class="event-creator"><div><span class="kicker">New attendance event</span><h2>Create a service or event</h2></div><form id="createEventForm"><label>Name<input name="name" required placeholder="e.g. Midweek Service"></label><label>Start time<input name="startsAt" type="time"></label><label>End time<input name="endsAt" type="time"></label><label>Type<select name="eventType"><option value="service">Church service</option><option value="conference">Conference</option><option value="event">Other event</option></select></label><button>Create and select</button><button type="button" class="quiet" id="cancelCreateEvent">Cancel</button></form></section>` : ""}
-    ${live ? `<section class="camera-card"><header class="selected-service"><span class="kicker">Now recording</span><b>${esc(selectedEvent?.name || state.service)}</b><small>${esc(state.location)}${selectedEvent?.startsAt ? ` · ${esc(selectedEvent.startsAt)}` : ""}</small></header><div class="camera-frame"><video id="camera" playsinline muted></video><div class="scan-guide"><i></i><span>Place QR code here</span></div></div><div class="camera-actions"><button id="cameraToggle">Start camera</button><span id="cameraStatus">Camera is off</span></div><form id="manualScan"><input id="code" autocomplete="off" autocapitalize="characters" placeholder="Or scan/type 482193"><button>Check in</button></form>${resultMarkup()}</section>` : `<section class="camera-card history-mode"><span class="kicker">Attendance history</span><h1>${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</h1><p>Scanning is disabled while viewing an earlier date. Counts and identified check-ins remain available.</p><button id="returnToday">Return to today</button></section>`}
-    <aside class="attendance-panel"><div class="attendance-heading"><span class="kicker">Official attendance</span><em class="${countSummary.provisional ? "provisional" : "complete"}">${countSummary.provisional ? "Provisional" : "3 counts complete"}</em></div><div class="attendance-total"><b>${countSummary.official || 0}</b><span>average of ${readings.length || 0} count${readings.length === 1 ? "" : "s"}<br>${state.total} identified check-ins</span></div>
+    ${state.workspaceTab === "events" ? `<section class="workspace-panel events-workspace"><header><div><span class="kicker">Events & imports</span><h1>Set up attendance</h1><p>Create services here, or bring them in from an existing source.</p></div></header><div class="event-actions"><button type="button" id="toggleCreateEvent">+ Create event</button><button type="button" id="importPlanningCenter">Import Planning Center</button><label class="file-action">Import history CSV<input id="historyImport" type="file" accept=".csv,text/csv"></label><a href="/attendance-history-template.csv" download>Download CSV template</a></div>${state.importMessage ? `<p class="event-message" role="status">${esc(state.importMessage)}</p>` : ""}${state.showCreateEvent ? `<section class="event-creator"><div><span class="kicker">New attendance event</span><h2>Create a service or event</h2></div><form id="createEventForm"><label>Name<input name="name" required placeholder="e.g. Midweek Service"></label><label>Start time<input name="startsAt" type="time"></label><label>End time<input name="endsAt" type="time"></label><label>Type<select name="eventType"><option value="sunday_service">Sunday service</option><option value="service">Church service</option><option value="conference">Conference</option><option value="event">Other event</option></select></label><button>Create and select</button><button type="button" class="quiet" id="cancelCreateEvent">Cancel</button></form></section>` : ""}<div class="event-library"><h2>Services on ${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</h2>${state.events.map((event) => `<button type="button" data-event-id="${event.id}" class="${Number(event.id) === state.eventId ? "active" : ""}"><span><b>${esc(event.name)}</b><small>${esc(event.location || state.location)} · ${esc(eventTypeLabels[event.eventType] || "Church service")}</small></span><strong>${esc(event.startsAt || "Time not set")}</strong></button>`).join("") || `<p class="empty">No events have been created for this date.</p>`}</div></section>` : ""}
+    ${state.workspaceTab === "checkin" ? (live ? `<section class="camera-card"><header class="selected-service"><span class="kicker">Now recording</span><b>${esc(selectedEvent?.name || state.service)}</b><small>${esc(state.location)} · ${esc(eventTypeLabels[selectedEvent?.eventType] || "Church service")}${selectedEvent?.startsAt ? ` · ${esc(selectedEvent.startsAt)}` : ""}</small></header><div class="camera-frame"><video id="camera" playsinline muted></video><div class="scan-guide"><i></i><span>Place QR code here</span></div></div><div class="camera-actions"><button id="cameraToggle">Start camera</button><span id="cameraStatus">Camera is off</span></div><form id="manualScan"><input id="code" autocomplete="off" autocapitalize="characters" placeholder="Or scan/type 482193"><button>Check in</button></form>${resultMarkup()}</section>` : `<section class="camera-card history-mode"><span class="kicker">Attendance history</span><h1>${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</h1><p>Scanning is disabled while viewing an earlier date. Counts and identified check-ins remain available.</p><button id="returnToday">Return to today</button></section>`) : ""}
+    ${state.workspaceTab === "counts" ? `<aside class="attendance-panel"><div class="attendance-heading"><span class="kicker">Official attendance</span><em class="${countSummary.provisional ? "provisional" : "complete"}">${countSummary.provisional ? "Provisional" : "3 counts complete"}</em></div><div class="attendance-total"><b>${countSummary.official || 0}</b><span>average of ${readings.length || 0} count${readings.length === 1 ? "" : "s"}<br>${state.total} identified check-ins</span></div>
       ${varianceWarning ? `<div class="variance-warning">Counts vary by ${countSummary.spread}. Review them before closing the service.</div>` : ""}
       <div class="reading-tabs">${[1, 2, 3].map((number) => { const item = readings.find((reading) => reading.reading === number); return `<button type="button" data-reading="${number}" class="${state.selectedReading === number ? "active" : ""} ${item ? "saved" : ""}"><span>Count ${number}</span><b>${item?.total ?? "—"}</b><small>${item ? new Date(item.recordedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "Not recorded"}</small></button>`; }).join("")}</div>
       ${live ? `<form id="headcountForm"><input type="hidden" name="reading" value="${state.selectedReading}"><div><label>Male<input name="male" type="number" min="0" max="50000" value="${selectedCount?.male ?? ""}" placeholder="0"></label><label>Female<input name="female" type="number" min="0" max="50000" value="${selectedCount?.female ?? ""}" placeholder="0"></label><label>Children<input name="children" type="number" min="0" max="50000" value="${selectedCount?.children ?? ""}" placeholder="0"></label></div><label>Count notes<textarea name="notes" rows="2" maxlength="300" placeholder="Optional">${esc(selectedCount?.notes || "")}</textarea></label><button>Save Count ${state.selectedReading}</button><p id="headcountStatus"></p></form>` : ""}
       <div class="headcount-history"><b>${countSummary.provisional ? "Awaiting all 3 counts" : `Official average ${countSummary.official}`}</b><span>${readings.length ? `Range ${countSummary.lowest}–${countSummary.highest}` : "No manual count saved yet"}</span>${readings.map((item) => `<p><strong>Count ${item.reading} · ${item.total}</strong><span>${item.male} male · ${item.female} female · ${item.children} children${item.unassigned ? ` · ${item.unassigned} unassigned` : ""}</span></p>`).join("")}</div>
-    </aside>
-    <section class="recent"><div><span class="kicker">${live ? "Live arrivals" : "Attendance record"}</span><h2>${live ? "Recently checked in" : "Recorded check-ins"}</h2></div>${state.recent.slice(0, 100).map((item) => `<article>${item.photoRecordId ? `<img src="/api/photo?record=${encodeURIComponent(item.photoRecordId)}" alt="">` : `<i>${esc(item.name[0])}</i>`}<div><b>${esc(item.name)}</b><span>${esc(item.service)} · ${new Date(item.checkedInAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span></div><strong>✓</strong></article>`).join("") || `<p class="empty">No check-ins match this service.</p>`}</section>
-  </main>${confirmationOverlay()}</div>`;
+    </aside>` : ""}
+    ${state.workspaceTab === "history" ? `<section class="recent"><div><span class="kicker">${live ? "Live arrivals" : "Attendance record"}</span><h2>${live ? "Recently checked in" : "Recorded check-ins"}</h2></div>${state.recent.slice(0, 100).map((item) => `<article>${item.photoRecordId ? `<img src="/api/photo?record=${encodeURIComponent(item.photoRecordId)}" alt="">` : `<i>${esc(item.name[0])}</i>`}<div><b>${esc(item.name)}</b><span>${esc(item.service)} · ${new Date(item.checkedInAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span></div><strong>✓</strong></article>`).join("") || `<p class="empty">No check-ins match this service.</p>`}</section>` : ""}
+  </section></main>${confirmationOverlay()}</div>`;
   bind();
 }
 function bind() {
+  document.querySelectorAll("[data-workspace-tab]").forEach((button) => {
+    button.onclick = async () => {
+      await stopCamera();
+      state.workspaceTab = button.dataset.workspaceTab;
+      localStorage.setItem("tlc_attendance_tab", state.workspaceTab);
+      render();
+      if (state.workspaceTab === "checkin" && state.date === todayInLondon()) await startCamera();
+    };
+  });
   document.querySelector("#historyDate").onchange = async (event) => {
     await stopCamera();
     state.date = event.target.value || todayInLondon();
@@ -213,7 +239,27 @@ function bind() {
     render();
     if (state.date === todayInLondon()) await startCamera();
   };
-  document.querySelector("#toggleCreateEvent").onclick = async () => {
+  document.querySelector("#serviceType").onchange = async (event) => {
+    await stopCamera();
+    state.eventType = event.target.value || "all";
+    const firstMatch = state.events.find((item) => state.eventType === "all" || (item.eventType || "service") === state.eventType);
+    if (firstMatch) {
+      state.eventId = Number(firstMatch.id);
+      state.service = firstMatch.name;
+      await loadOverview();
+    }
+    render();
+    if (state.workspaceTab === "checkin" && state.date === todayInLondon()) await startCamera();
+  };
+  document.querySelectorAll("[data-event-id]").forEach((button) => {
+    button.onclick = async () => {
+      state.eventId = Number(button.dataset.eventId || 0);
+      state.service = state.events.find((item) => Number(item.id) === state.eventId)?.name || state.service;
+      await loadOverview();
+      render();
+    };
+  });
+  if (document.querySelector("#toggleCreateEvent")) document.querySelector("#toggleCreateEvent").onclick = async () => {
     await stopCamera();
     state.showCreateEvent = !state.showCreateEvent;
     render();
@@ -251,7 +297,7 @@ function bind() {
         render();
       }
     };
-  document.querySelector("#importPlanningCenter").onclick = async (event) => {
+  if (document.querySelector("#importPlanningCenter")) document.querySelector("#importPlanningCenter").onclick = async (event) => {
     const button = event.currentTarget;
     button.disabled = true;
     state.importMessage = "Checking Planning Center…";
@@ -271,7 +317,7 @@ function bind() {
     render();
     if (state.date === todayInLondon()) await startCamera();
   };
-  document.querySelector("#historyImport").onchange = async (event) => {
+  if (document.querySelector("#historyImport")) document.querySelector("#historyImport").onchange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {

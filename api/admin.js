@@ -324,9 +324,20 @@ module.exports = async function handler(req, res) {
           [date, locationFilter, serviceFilter],
         ),
         serviceRows = await db.query(
-          `SELECT DISTINCT service_label FROM checkin_events
-           WHERE service_date=$1::date AND ($2='' OR location=$2)
-           ORDER BY service_label`,
+          `WITH available AS (
+             SELECT name AS service_label,event_type,starts_at
+             FROM attendance_events
+             WHERE event_date=$1::date AND ($2='' OR location=$2)
+             UNION ALL
+             SELECT DISTINCT service_label,'service'::text AS event_type,NULL::time AS starts_at
+             FROM checkin_events
+             WHERE service_date=$1::date AND ($2='' OR location=$2)
+           )
+           SELECT service_label,
+                  (array_agg(event_type ORDER BY starts_at NULLS LAST))[1] AS event_type,
+                  min(starts_at) AS starts_at
+           FROM available GROUP BY service_label
+           ORDER BY min(starts_at) NULLS LAST,service_label`,
           [date, locationFilter],
         ),
         headcountRows = await db.query(
@@ -369,6 +380,11 @@ module.exports = async function handler(req, res) {
         selectedLocation: locationFilter,
         selectedService: serviceFilter,
         services: serviceRows.map((row) => row.service_label),
+        serviceOptions: serviceRows.map((row) => ({
+          name: row.service_label,
+          type: row.event_type || "service",
+          startsAt: row.starts_at ? String(row.starts_at).slice(0, 5) : "",
+        })),
         total: filtered.length,
         summary: summaryRows.map((row) => ({
           location: row.location,

@@ -148,3 +148,16 @@ test("attendance events connect scans, counts, dashboards and imports", () => {
   assert.match(displayApi, /availableEvents/);
   assert.match(displayUi, /id="displayEvent"/);
 });
+
+test("attendance operations are separated into CRM tabs and expose service types", () => {
+  const checkinUi = source("check-in.js"),
+    adminApi = source("api/admin.js"),
+    adminUi = source("app.js");
+  for (const tab of ["Check-in", "Counts", "Events & imports", "History"])
+    assert.match(checkinUi, new RegExp(`\\[\\\"[^\\\"]+\\\", \\"${tab}`));
+  assert.match(checkinUi, /id="serviceType"/);
+  assert.match(checkinUi, /sunday_service: "Sunday service"/);
+  assert.match(adminApi, /FROM attendance_events/);
+  assert.match(adminApi, /serviceOptions:/);
+  assert.match(adminUi, /Service and type/);
+});

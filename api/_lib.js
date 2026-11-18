@@ -377,6 +377,12 @@ async function migrateDb() {
     `CREATE INDEX IF NOT EXISTS attendance_events_date_location_idx
      ON attendance_events(event_date,location,starts_at,name)`,
   );
+  await db.query(
+    `UPDATE attendance_events SET event_type='sunday_service',updated_at=now()
+     WHERE source='default'
+       AND name IN ('First Sunday Service','Second Sunday Service')
+       AND event_type<>'sunday_service'`,
+  );
   await db.query(`CREATE TABLE IF NOT EXISTS checkin_events (
     id bigserial PRIMARY KEY,
     identity_id bigint NOT NULL REFERENCES tlc_identities(id) ON DELETE RESTRICT,

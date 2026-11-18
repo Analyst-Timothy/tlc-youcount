@@ -70,6 +70,7 @@ async function ensureEvent(db, details = {}) {
      ON CONFLICT(event_date,location,name) DO UPDATE SET
        starts_at=COALESCE(excluded.starts_at,attendance_events.starts_at),
        ends_at=COALESCE(excluded.ends_at,attendance_events.ends_at),
+       event_type=COALESCE(excluded.event_type,attendance_events.event_type),
        external_app=COALESCE(excluded.external_app,attendance_events.external_app),
        external_id=COALESCE(excluded.external_id,attendance_events.external_id),
        updated_at=now()
@@ -85,9 +86,10 @@ async function ensureDefaultServices(db, date, location) {
     `INSERT INTO attendance_events(
        event_date,location,name,starts_at,event_type,source,status,created_by
      ) VALUES
-       ($1::date,$2,$3,$4::time,'service','default','planned','system'),
-       ($1::date,$2,$5,$6::time,'service','default','planned','system')
-     ON CONFLICT(event_date,location,name) DO NOTHING`,
+       ($1::date,$2,$3,$4::time,'sunday_service','default','planned','system'),
+       ($1::date,$2,$5,$6::time,'sunday_service','default','planned','system')
+     ON CONFLICT(event_date,location,name) DO UPDATE SET
+       event_type='sunday_service',starts_at=excluded.starts_at,updated_at=now()`,
     [date, location, DEFAULT_SERVICES[0].name, DEFAULT_SERVICES[0].startsAt,
       DEFAULT_SERVICES[1].name, DEFAULT_SERVICES[1].startsAt],
   );

@@ -131,3 +131,55 @@ h1 { font-size:38px; margin:8px 0; color:var(--navy); font-weight:800; letter-sp
 /* Shared TLC staff entrance */
 .login-screen { place-items:center !important;justify-content:center !important;padding:28px 18px !important;background:linear-gradient(rgba(3,30,54,.66),rgba(3,30,54,.78)),url("/assets/staff-community-login-v1.webp") center/cover no-repeat !important; }
 .login-card { margin:auto;width:min(440px,100%); }
+
+/* Attendance CRM layout */
+.scanner-app main.crm-layout { width:min(1240px,100%); grid-template-columns:210px minmax(0,1fr); align-items:start; }
+.crm-sidebar { position:sticky; top:108px; display:grid; gap:18px; padding:18px 12px; border:1px solid #d5dfe8; border-radius:16px; background:#fff; box-shadow:0 10px 28px #123b600d; }
+.crm-sidebar nav { display:grid; gap:6px; }
+.crm-sidebar nav button { display:grid; gap:2px; width:100%; border:0; border-radius:10px; padding:12px; color:var(--muted); background:transparent; text-align:left; }
+.crm-sidebar nav button:hover { background:#f0f5f9; }
+.crm-sidebar nav button.active { color:var(--navy); background:#e7eef6; box-shadow:inset 3px 0 var(--navy); }
+.crm-sidebar nav b { font-size:13px; font-weight:700; }
+.crm-sidebar nav small { font-size:10px; font-weight:400; }
+.crm-sidebar > p { margin:0 8px; color:var(--muted); font-size:10px; }
+.crm-content { min-width:0; display:grid; grid-template-columns:minmax(0,1fr); gap:18px; }
+.service-settings { grid-template-columns:repeat(4,minmax(0,1fr)); }
+.service-settings label { font-weight:650; }
+.workspace-panel { min-width:0; padding:22px; border:1px solid #d5dfe8; border-radius:16px; background:#fff; box-shadow:0 10px 28px #123b600d; }
+.workspace-panel > header h1 { margin:4px 0; font-size:30px; }
+.workspace-panel > header p { margin:0; color:var(--muted); font-size:13px; }
+.events-workspace { display:grid; gap:20px; }
+.events-workspace .event-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:0; }
+.events-workspace .event-actions button,.events-workspace .file-action,.events-workspace .event-actions a { display:flex; align-items:center; min-height:54px; border-radius:10px; padding:14px; font-size:12px; font-weight:650; }
+.events-workspace .event-creator { display:grid; grid-template-columns:1fr; }
+.events-workspace .event-creator form { grid-template-columns:2fr 1fr 1fr 1.2fr auto auto; }
+.event-library { display:grid; gap:8px; padding-top:18px; border-top:1px solid #dfe6ed; }
+.event-library h2 { margin:0 0 6px; font-size:19px; }
+.event-library > button { display:flex; justify-content:space-between; align-items:center; gap:16px; width:100%; border:1px solid #d5dfe8; border-radius:11px; padding:13px 15px; color:var(--navy); background:#fff; text-align:left; }
+.event-library > button.active { border-color:var(--navy); background:#edf3f8; box-shadow:inset 3px 0 var(--navy); }
+.event-library > button span { display:grid; gap:3px; }
+.event-library > button b { font-size:13px; font-weight:700; }
+.event-library > button small { color:var(--muted); font-weight:400; }
+.event-library > button strong { font-size:12px; font-weight:600; white-space:nowrap; }
+.camera-card,.recent,.attendance-panel { min-width:0; }
+.selected-service b,.recent h2,.headcount-history > b { font-weight:700; }
+.reading-tabs button,.attendance-heading em,#headcountForm label,.variance-warning { font-weight:600; }
+.attendance-total b { font-weight:700; }
+
+@media(max-width:900px) {
+  .scanner-app main.crm-layout { grid-template-columns:1fr; }
+  .crm-sidebar { position:static; padding:10px; }
+  .crm-sidebar > .kicker,.crm-sidebar > p { display:none; }
+  .crm-sidebar nav { grid-template-columns:repeat(4,minmax(120px,1fr)); overflow-x:auto; }
+  .crm-sidebar nav button.active { box-shadow:inset 0 -3px var(--navy); }
+  .service-settings { grid-template-columns:1fr 1fr; }
+  .events-workspace .event-creator form { grid-template-columns:1fr 1fr; }
+}
+@media(max-width:560px) {
+  .crm-sidebar { overflow:hidden; }
+  .crm-sidebar nav { display:flex; }
+  .crm-sidebar nav button { flex:0 0 138px; }
+  .service-settings { grid-template-columns:1fr; }
+  .events-workspace .event-actions,.events-workspace .event-creator form { grid-template-columns:1fr; }
+  .workspace-panel { padding:16px; }
+}

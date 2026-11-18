@@ -3,8 +3,8 @@ const { test, expect } = require("@playwright/test");
 test("TED selects services, records three counts and gets an official average", async ({ page }) => {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   let events = [
-      { id: 1, date: today, location: "North London", name: "First Sunday Service", startsAt: "09:00", source: "default", status: "planned" },
-      { id: 2, date: today, location: "North London", name: "Second Sunday Service", startsAt: "11:30", source: "default", status: "planned" },
+      { id: 1, date: today, location: "North London", name: "First Sunday Service", startsAt: "09:00", eventType: "sunday_service", source: "default", status: "planned" },
+      { id: 2, date: today, location: "North London", name: "Second Sunday Service", startsAt: "11:30", eventType: "sunday_service", source: "default", status: "planned" },
     ],
     selectedEventId = 1,
     readings = [],
@@ -81,6 +81,8 @@ test("TED selects services, records three counts and gets an official average", 
   await page.goto("/check-in.html");
   await expect(page.getByLabel("Service or event")).toContainText("First Sunday Service");
   await expect(page.getByLabel("Service or event")).toContainText("Second Sunday Service");
+  await expect(page.getByLabel("Service type")).toContainText("Sunday service");
+  await page.getByRole("button", { name: /Counts/ }).click();
 
   for (const [reading, values] of [[1, [100, 120, 30]], [2, [105, 125, 35]], [3, [98, 122, 32]]]) {
     await page.locator(`[data-reading="${reading}"]`).click();
@@ -88,11 +90,13 @@ test("TED selects services, records three counts and gets an official average", 
     await page.getByLabel("Female", { exact: true }).fill(String(values[1]));
     await page.getByLabel("Children", { exact: true }).fill(String(values[2]));
     await page.getByRole("button", { name: `Save Count ${reading}` }).click();
+    await expect(page.locator(`[data-reading="${reading}"] b`)).toHaveText(String(values[0] + values[1] + values[2]));
   }
 
   await expect(page.getByText("3 counts complete")).toBeVisible();
   await expect(page.locator(".attendance-total > b")).toHaveText("256");
 
+  await page.getByRole("button", { name: /Events & imports/ }).click();
   await page.getByRole("button", { name: "+ Create event" }).click();
   await page.getByLabel("Name").fill("Growth Track");
   await page.getByLabel("Start time").fill("14:00");

@@ -1035,6 +1035,10 @@ function checkinBody() {
     rows = data.checkins || [],
     locations = data.locations || ["Liberty Point Woodford", "North London", "Canary Wharf", "Croydon", "Birmingham", "Lagos", "Houston", "e-TLC"],
     services = data.services || [],
+    serviceOptions = data.serviceOptions?.length
+      ? data.serviceOptions
+      : services.map((name) => ({ name, type: "service", startsAt: "" })),
+    serviceTypeLabel = { sunday_service: "Sunday service", service: "Church service", conference: "Conference", event: "Other event" },
     result = state.checkinResult,
     headcounts = data.headcounts || [],
     roomTotal = headcounts.reduce((total, item) => total + Number(item.total || 0), 0);
@@ -1045,13 +1049,13 @@ function checkinBody() {
       </article>`
     : `<div class="scanner-ready"><i>▣</i><div><b>Scanner ready</b><span>Present the QR code or enter the YouCount Number.</span></div></div>`;
   return `<section class="checkin-workspace">
-    <form class="attendance-filters" id="checkinFilters"><label><span>Calendar date</span><input type="date" name="date" value="${esc(state.checkinDate)}"></label><label><span>Location</span><select name="location"><option value="">All locations</option>${locations.map((location) => `<option value="${esc(location)}" ${state.checkinHistoryLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label><label><span>Service</span><select name="service"><option value="">All services</option>${services.map((service) => `<option value="${esc(service)}" ${state.checkinHistoryService === service ? "selected" : ""}>${esc(service)}</option>`).join("")}</select></label><label><span>Find a person</span><input name="search" value="${esc(state.checkinHistorySearch)}" placeholder="Name or YouCount Number"></label><button class="btn secondary">Apply filters</button><button class="btn ghost" type="button" id="clearCheckinFilters">Clear</button></form>
+    <form class="attendance-filters" id="checkinFilters"><label><span>Calendar date</span><input type="date" name="date" value="${esc(state.checkinDate)}"></label><label><span>Location</span><select name="location"><option value="">All locations</option>${locations.map((location) => `<option value="${esc(location)}" ${state.checkinHistoryLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label><label><span>Service and type</span><select name="service"><option value="">All services</option>${serviceOptions.map((service) => `<option value="${esc(service.name)}" ${state.checkinHistoryService === service.name ? "selected" : ""}>${service.startsAt ? `${esc(service.startsAt)} · ` : ""}${esc(service.name)} · ${esc(serviceTypeLabel[service.type] || "Church service")}</option>`).join("")}</select></label><label><span>Find a person</span><input name="search" value="${esc(state.checkinHistorySearch)}" placeholder="Name or YouCount Number"></label><button class="btn secondary">Apply filters</button><button class="btn ghost" type="button" id="clearCheckinFilters">Clear</button></form>
     <div class="checkin-command">
       <section class="scanner-card">
         <header><div><span class="eyebrow">Welcome team scanner</span><h3>Scan a YouCount Card</h3></div><span class="scanner-live">● Ready</span></header>
         <div class="scanner-context">
           <label><span>Location</span><select id="checkinLocation">${locations.map((location) => `<option ${state.checkinLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label>
-          <label><span>Service</span><input id="checkinService" value="${esc(state.checkinService)}" placeholder="e.g. First Service"></label>
+          <label><span>Service and type</span><select id="checkinService">${serviceOptions.map((service) => `<option value="${esc(service.name)}" ${state.checkinService === service.name ? "selected" : ""}>${service.startsAt ? `${esc(service.startsAt)} · ` : ""}${esc(service.name)} · ${esc(serviceTypeLabel[service.type] || "Church service")}</option>`).join("")}${!serviceOptions.some((service) => service.name === state.checkinService) ? `<option selected>${esc(state.checkinService)}</option>` : ""}</select></label>
         </div>
         <div class="camera-shell" id="cameraShell"><video id="checkinCamera" playsinline muted></video><div><b>Camera scanner</b><span>Keep the QR code inside the frame.</span></div></div>
         <div class="scanner-actions"><button class="btn secondary" id="startCheckinCamera">${state.checkinCameraActive ? "Stop camera" : "Use phone camera"}</button><span>or use a USB/Bluetooth scanner below</span></div>
