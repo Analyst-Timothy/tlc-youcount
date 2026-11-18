@@ -401,7 +401,7 @@ module.exports = async function handler(req, res) {
       return L.json(res, 200, { ok: true });
     }
     if (!authorised(req)) return L.json(res, 401, { ok: false });
-    const db = ["headcount", "createEvent", "importPlanningCenter", "importHistory"].includes(action)
+    const db = ["overview", "headcount", "createEvent", "importPlanningCenter", "importHistory"].includes(action)
       ? await L.migrateDb()
       : await L.initDb();
     if (action === "overview")
