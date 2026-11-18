@@ -1,6 +1,6 @@
 const { test, expect } = require("@playwright/test");
 
-test("TED selects services, records three counts and gets an official average", async ({ page }) => {
+test("TED records unlimited spreadsheet headcounts and gets a group average", async ({ page }) => {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });
   let events = [
       { id: 1, date: today, location: "North London", name: "First Sunday Service", startsAt: "09:00", eventType: "sunday_service", source: "default", status: "planned" },
@@ -11,7 +11,8 @@ test("TED selects services, records three counts and gets an official average", 
     nextEventId = 3;
   const response = () => {
     const totals = readings.map((item) => item.total),
-      official = totals.length ? Math.round(totals.reduce((sum, total) => sum + total, 0) / totals.length) : 0;
+      groups = [...new Set(readings.map((item) => item.group))],
+      official = groups.reduce((sum, group) => { const values = readings.filter((item) => item.group === group).map((item) => item.total); return sum + Math.round(values.reduce((a,b) => a+b,0) / values.length); }, 0);
     return {
       ok: true,
       date: today,
@@ -27,7 +28,7 @@ test("TED selects services, records three counts and gets an official average", 
       headcountSummary: {
         readings,
         official,
-        provisional: readings.length < 3,
+        provisional: readings.length < 1,
         lowest: totals.length ? Math.min(...totals) : 0,
         highest: totals.length ? Math.max(...totals) : 0,
         spread: totals.length ? Math.max(...totals) - Math.min(...totals) : 0,
@@ -47,18 +48,18 @@ test("TED selects services, records three counts and gets an official average", 
     }
     if (body.action === "headcount") {
       selectedEventId = Number(body.eventId);
-      const item = {
-        id: Number(body.reading),
-        reading: Number(body.reading),
-        mainChurch: Number(body.mainChurch || 0),
-        children: Number(body.children || 0),
-        teenagers: Number(body.teenagers || 0),
-        total: Number(body.mainChurch || 0) + Number(body.children || 0) + Number(body.teenagers || 0),
-        notes: body.notes || "",
+      const total = Number(body.male || 0) + Number(body.female || 0),
+        item = {
+        id: readings.length + 1,
+        reading: readings.length + 1,
+        male: Number(body.male || 0), female: Number(body.female || 0),
+        mainChurch: body.group === "Main Church" ? total : 0,
+        children: body.group === "Children" ? total : 0,
+        teenagers: body.group === "Teenagers" ? total : 0,
+        total, group: body.group, counterName: body.counterName,
         recordedAt: new Date().toISOString(),
       };
-      readings = [...readings.filter((reading) => reading.reading !== item.reading), item]
-        .sort((a, b) => a.reading - b.reading);
+      readings = [...readings, item];
       return route.fulfill({ json: response() });
     }
     if (body.action === "createEvent") {
@@ -83,17 +84,16 @@ test("TED selects services, records three counts and gets an official average", 
   await expect(page.getByLabel("Service type")).toContainText("Sunday service");
   await page.getByRole("button", { name: /Headcounts/ }).click();
 
-  for (const [reading, values] of [[1, [200, 30, 20]], [2, [210, 35, 20]], [3, [202, 30, 20]]]) {
-    await page.locator(`[data-reading="${reading}"]`).click();
-    await page.getByLabel("Main Church", { exact: true }).fill(String(values[0]));
-    await page.getByLabel("Children", { exact: true }).fill(String(values[1]));
-    await page.getByLabel("Teenagers", { exact: true }).fill(String(values[2]));
-    await page.getByRole("button", { name: `Save Count ${reading}` }).click();
-    await expect(page.locator(`[data-reading="${reading}"] b`)).toHaveText(String(values[0] + values[1] + values[2]));
+  for (const [index, values] of [[100, 120], [105, 125], [98, 122], [101, 121], [102, 123], [99, 119]].entries()) {
+    await page.getByLabel("Male", { exact: true }).fill(String(values[0]));
+    await page.getByLabel("Female", { exact: true }).fill(String(values[1]));
+    await page.getByLabel("Recorded by", { exact: true }).fill("TED Tester");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.locator(".sheet-table-row")).toHaveCount(index + 1);
   }
 
-  await expect(page.getByText("3 counts complete")).toBeVisible();
-  await expect(page.locator(".attendance-total > b")).toHaveText("256");
+  await expect(page.getByText("Live average")).toBeVisible();
+  await expect(page.locator(".attendance-total > b")).toHaveText("223");
 
   await page.getByRole("button", { name: /^Events/ }).click();
   await page.getByRole("button", { name: "+ Create event" }).click();

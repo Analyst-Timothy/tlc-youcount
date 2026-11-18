@@ -457,6 +457,9 @@ async function migrateDb() {
   );
   await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS main_church_count integer NOT NULL DEFAULT 0 CHECK (main_church_count >= 0)`);
   await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS teenager_count integer NOT NULL DEFAULT 0 CHECK (teenager_count >= 0)`);
+  await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS group_name text`);
+  await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS counter_name text`);
+  await db.query(`ALTER TABLE attendance_headcount_readings DROP CONSTRAINT IF EXISTS attendance_headcount_readings_reading_number_check`);
   await db.query(`UPDATE attendance_headcount_readings
     SET main_church_count=male_count+female_count+unassigned_count
     WHERE main_church_count=0 AND (male_count+female_count+unassigned_count)>0`);

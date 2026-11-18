@@ -114,8 +114,10 @@ function readingSummary(rows = []) {
       female = Number(row.female_count || 0),
       children = Number(row.children_count || 0),
       unassigned = Number(row.unassigned_count || 0),
-      mainChurch = Number(row.main_church_count || 0) || male + female + unassigned,
-      teenagers = Number(row.teenager_count || 0);
+      group = row.group_name || "",
+      mainChurch = group ? Number(row.main_church_count || 0) : Number(row.main_church_count || 0) || male + female + unassigned,
+      teenagers = Number(row.teenager_count || 0),
+      total = group ? male + female : mainChurch + children + teenagers;
     return {
       id: Number(row.id),
       reading: Number(row.reading_number),
@@ -125,21 +127,33 @@ function readingSummary(rows = []) {
       mainChurch,
       teenagers,
       unassigned,
-      total: mainChurch + children + teenagers,
+      total,
+      group,
+      counterName: row.counter_name || "",
       notes: row.notes || "",
       device: row.device_label || "",
       recordedAt: row.recorded_at,
       updatedAt: row.updated_at,
     };
   });
-  const totals = readings.map((item) => item.total),
-    official = totals.length
-      ? Math.round(totals.reduce((sum, total) => sum + total, 0) / totals.length)
-      : 0;
+  const grouped = readings.filter((item) => item.group),
+    activeReadings = grouped.length ? grouped : readings,
+    totals = activeReadings.map((item) => item.total),
+    groupAverages = grouped.length
+      ? [...new Set(grouped.map((item) => item.group))].map((group) => {
+          const values = grouped.filter((item) => item.group === group).map((item) => item.total);
+          return Math.round(values.reduce((sum, total) => sum + total, 0) / values.length);
+        })
+      : [],
+    official = grouped.length
+      ? groupAverages.reduce((sum, total) => sum + total, 0)
+      : totals.length
+        ? Math.round(totals.reduce((sum, total) => sum + total, 0) / totals.length)
+        : 0;
   return {
     readings,
     official,
-    provisional: readings.length < 3,
+    provisional: readings.length < 1,
     lowest: totals.length ? Math.min(...totals) : 0,
     highest: totals.length ? Math.max(...totals) : 0,
     spread: totals.length ? Math.max(...totals) - Math.min(...totals) : 0,
@@ -194,39 +208,57 @@ async function importPlanningCenterEvents(db, date, location) {
 }
 
 async function saveReading(db, event, details = {}) {
-  const reading = Math.max(1, Math.min(3, Math.round(Number(details.reading) || 1))),
+  const nextRows = await db.query(
+      `SELECT coalesce(max(reading_number),0)+1 AS reading FROM attendance_headcount_readings WHERE attendance_event_id=$1`,
+      [event.id],
+    ),
+    reading = Math.max(1, Math.min(32000, Math.round(Number(details.reading) || Number(nextRows[0]?.reading) || 1))),
     male = Math.max(0, Math.min(50000, Math.round(Number(details.male) || 0))),
     female = Math.max(0, Math.min(50000, Math.round(Number(details.female) || 0))),
     children = Math.max(0, Math.min(50000, Math.round(Number(details.children) || 0))),
     unassigned = Math.max(0, Math.min(50000, Math.round(Number(details.unassigned) || 0))),
-    mainChurch = Math.max(0, Math.min(50000, Math.round(Number(details.mainChurch) || male + female + unassigned))),
-    teenagers = Math.max(0, Math.min(50000, Math.round(Number(details.teenagers) || 0))),
+    group = ["Main Church", "Teenagers", "Children"].includes(String(details.group || "")) ? String(details.group) : "Main Church",
+    groupTotal = male + female,
+    mainChurch = group === "Main Church" ? groupTotal : Math.max(0, Math.min(50000, Math.round(Number(details.mainChurch) || 0))),
+    teenagers = group === "Teenagers" ? groupTotal : Math.max(0, Math.min(50000, Math.round(Number(details.teenagers) || 0))),
+    groupChildren = group === "Children" ? groupTotal : children,
     notes = String(details.notes || "").trim().slice(0, 300),
-    device = clean(details.device, 60) || "Attendance team device";
-  if (mainChurch + children + teenagers < 1)
+    device = clean(details.device, 60) || "Attendance team device",
+    counterName = clean(details.counterName, 80),
+    countTime = cleanTime(details.countTime);
+  if (!counterName) throw new Error("attendance_counter_required");
+  if (mainChurch + groupChildren + teenagers < 1)
     throw new Error("attendance_count_required");
   await db.query(
     `INSERT INTO attendance_headcount_readings(
        attendance_event_id,reading_number,male_count,female_count,children_count,
-       unassigned_count,main_church_count,teenager_count,notes,device_label
-     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       unassigned_count,main_church_count,teenager_count,group_name,counter_name,notes,device_label,recorded_at
+     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,
+       CASE WHEN $13::time IS NULL THEN now() ELSE ($14::date + $13::time) AT TIME ZONE 'Europe/London' END)
      ON CONFLICT(attendance_event_id,reading_number) DO UPDATE SET
        male_count=excluded.male_count,female_count=excluded.female_count,
        children_count=excluded.children_count,unassigned_count=excluded.unassigned_count,
        main_church_count=excluded.main_church_count,teenager_count=excluded.teenager_count,
-       notes=excluded.notes,device_label=excluded.device_label,recorded_at=now(),updated_at=now()`,
-    [event.id, reading, 0, 0, children, 0, mainChurch, teenagers, notes || null, device],
+       group_name=excluded.group_name,counter_name=excluded.counter_name,
+       notes=excluded.notes,device_label=excluded.device_label,recorded_at=excluded.recorded_at,updated_at=now()`,
+    [event.id, reading, male, female, groupChildren, 0, mainChurch, teenagers, group, counterName,
+      notes || null, device, countTime, event.event_date],
   );
   const rows = await db.query(
     `SELECT id,reading_number,male_count,female_count,children_count,unassigned_count,
-            main_church_count,teenager_count,
+            main_church_count,teenager_count,group_name,counter_name,
             notes,device_label,recorded_at,updated_at
      FROM attendance_headcount_readings WHERE attendance_event_id=$1 ORDER BY reading_number`,
     [event.id],
   );
   const summary = readingSummary(rows),
+    groupedRows = rows.filter((row) => row.group_name),
+    averageGroup = (name) => {
+      const items = groupedRows.filter((row) => row.group_name === name);
+      return items.length ? Math.round(items.reduce((sum, row) => sum + Number(row.male_count || 0) + Number(row.female_count || 0), 0) / items.length) : 0;
+    },
     divisor = Math.max(1, rows.length),
-    average = (key) => Math.round(rows.reduce((sum, row) => sum + Number(row[key] || 0), 0) / divisor);
+    average = (key) => groupedRows.length ? averageGroup(key) : Math.round(rows.reduce((sum, row) => sum + Number(row[key] || 0), 0) / divisor);
   // Keep the legacy aggregate current while the data-team admin view transitions
   // to event IDs. This is the rounded average, never the latest count alone.
   await db.query(
@@ -240,7 +272,9 @@ async function saveReading(db, event, details = {}) {
        main_church_count=excluded.main_church_count,teenager_count=excluded.teenager_count,
        device_label=excluded.device_label,updated_at=now()`,
     [event.event_date, event.location, event.name, 0, 0,
-      average("children_count"),average("main_church_count"),average("teenager_count"),
+      groupedRows.length ? average("Children") : average("children_count"),
+      groupedRows.length ? average("Main Church") : average("main_church_count"),
+      groupedRows.length ? average("Teenagers") : average("teenager_count"),
       `Official average of ${rows.length} count${rows.length === 1 ? "" : "s"}${notes ? ` · ${notes}` : ""}`,
       device],
   );
@@ -299,7 +333,7 @@ async function overview(db, body = {}) {
     readings = selectedEventId
       ? await db.query(
           `SELECT id,reading_number,male_count,female_count,children_count,
-                  unassigned_count,main_church_count,teenager_count,notes,device_label,recorded_at,updated_at
+                  unassigned_count,main_church_count,teenager_count,group_name,counter_name,notes,device_label,recorded_at,updated_at
            FROM attendance_headcount_readings
            WHERE attendance_event_id=$1 ORDER BY reading_number`,
           [selectedEventId],
@@ -308,13 +342,20 @@ async function overview(db, body = {}) {
     summary = readingSummary(readings);
   const locationSummary = service
     ? await db.query(
-        `WITH event_totals AS (
-           SELECT e.id,e.location,
-                  round(avg(r.main_church_count+r.children_count+r.teenager_count))::int AS official
+        `WITH group_averages AS (
+           SELECT e.id,e.location,coalesce(r.group_name,'Legacy') AS group_name,
+                  round(avg(r.main_church_count+r.children_count+r.teenager_count))::int AS group_average
            FROM attendance_events e
            LEFT JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
+             AND (r.group_name IS NOT NULL OR NOT EXISTS (
+               SELECT 1 FROM attendance_headcount_readings newer
+               WHERE newer.attendance_event_id=e.id AND newer.group_name IS NOT NULL
+             ))
            WHERE e.event_date=$1::date AND e.name=$2
-           GROUP BY e.id,e.location
+           GROUP BY e.id,e.location,coalesce(r.group_name,'Legacy')
+         ), event_totals AS (
+           SELECT id,location,sum(group_average)::int AS official
+           FROM group_averages GROUP BY id,location
          ), identified AS (
            SELECT location,count(*)::int AS identified
            FROM checkin_events
@@ -472,6 +513,7 @@ module.exports = async function handler(req, res) {
             children: item.children,
             teenagers: item.teenagers,
             notes: item.notes,
+            counterName: item.counterName || "Historical import",
             device: "Historical spreadsheet import",
           });
           imported += 1;
@@ -508,6 +550,8 @@ module.exports = async function handler(req, res) {
       } catch (error) {
         if (error.message === "attendance_count_required")
           return L.json(res, 400, { ok: false, message: "Enter at least one attendance count." });
+        if (error.message === "attendance_counter_required")
+          return L.json(res, 400, { ok: false, message: "Enter the name of the person recording this count." });
         throw error;
       }
       await L.audit(db, null, ipHash, "attendance_headcount_saved", {

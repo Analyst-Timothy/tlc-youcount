@@ -100,7 +100,7 @@ test("Woodford uses one canonical location name", () => {
   );
 });
 
-test("TED attendance keeps three readings and calculates the rounded average", () => {
+test("TED attendance preserves legacy readings and calculates the rounded average", () => {
   const checkin = require("../checkin-handler");
   assert.deepEqual(checkin._defaultServices, [
     { name: "First Sunday Service", startsAt: "09:00" },
@@ -115,9 +115,9 @@ test("TED attendance keeps three readings and calculates the rounded average", (
     ]),
     {
       readings: [
-        { id: 1, reading: 1, male: 100, female: 120, children: 30, mainChurch: 220, teenagers: 0, unassigned: 0, total: 250, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
-        { id: 2, reading: 2, male: 105, female: 125, children: 35, mainChurch: 230, teenagers: 0, unassigned: 0, total: 265, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
-        { id: 3, reading: 3, male: 98, female: 122, children: 32, mainChurch: 220, teenagers: 0, unassigned: 0, total: 252, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 1, reading: 1, male: 100, female: 120, children: 30, mainChurch: 220, teenagers: 0, unassigned: 0, total: 250, group: "", counterName: "", notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 2, reading: 2, male: 105, female: 125, children: 35, mainChurch: 230, teenagers: 0, unassigned: 0, total: 265, group: "", counterName: "", notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 3, reading: 3, male: 98, female: 122, children: 32, mainChurch: 220, teenagers: 0, unassigned: 0, total: 252, group: "", counterName: "", notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
       ],
       official: 256,
       provisional: false,
@@ -126,6 +126,16 @@ test("TED attendance keeps three readings and calculates the rounded average", (
       spread: 15,
     },
   );
+  const grouped = checkin._readingSummary([
+    { id: 1, reading_number: 1, male_count: 100, female_count: 120, main_church_count: 220, group_name: "Main Church", counter_name: "A" },
+    { id: 2, reading_number: 2, male_count: 105, female_count: 125, main_church_count: 230, group_name: "Main Church", counter_name: "B" },
+    { id: 3, reading_number: 3, male_count: 20, female_count: 30, teenager_count: 50, group_name: "Teenagers", counter_name: "C" },
+    { id: 4, reading_number: 4, male_count: 22, female_count: 32, teenager_count: 54, group_name: "Teenagers", counter_name: "D" },
+    { id: 5, reading_number: 5, male_count: 15, female_count: 20, children_count: 35, group_name: "Children", counter_name: "E" },
+    { id: 6, reading_number: 6, male_count: 17, female_count: 22, children_count: 39, group_name: "Children", counter_name: "F" },
+  ]);
+  assert.equal(grouped.readings.length, 6);
+  assert.equal(grouped.official, 314);
 });
 
 test("attendance events connect scans, counts, dashboards and imports", () => {
@@ -136,13 +146,15 @@ test("attendance events connect scans, counts, dashboards and imports", () => {
     displayUi = source("service-display.js");
   assert.match(schema, /CREATE TABLE IF NOT EXISTS attendance_events/);
   assert.match(schema, /CREATE TABLE IF NOT EXISTS attendance_headcount_readings/);
-  assert.match(schema, /reading_number smallint NOT NULL CHECK \(reading_number BETWEEN 1 AND 3\)/);
+  assert.match(schema, /DROP CONSTRAINT IF EXISTS attendance_headcount_readings_reading_number_check/);
+  assert.match(schema, /ADD COLUMN IF NOT EXISTS counter_name text/);
   assert.match(schema, /ALTER TABLE checkin_events ADD COLUMN IF NOT EXISTS attendance_event_id/);
   assert.match(handler, /action === "createEvent"/);
   assert.match(handler, /action === "importPlanningCenter"/);
   assert.match(handler, /action === "importHistory"/);
   assert.match(handler, /attendance_event_id\n\s*\)/);
-  assert.match(checkinUi, /Count \$\{number\}/);
+  assert.match(checkinUi, /Headcount register/);
+  assert.match(checkinUi, /name="counterName"/);
   assert.match(checkinUi, /Import Planning Center/);
   assert.match(checkinUi, /Import history CSV/);
   assert.match(displayApi, /availableEvents/);

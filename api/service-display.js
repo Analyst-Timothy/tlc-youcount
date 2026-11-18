@@ -137,24 +137,29 @@ async function summary(db, options = {}) {
         AND ($3::bigint=0 OR attendance_event_id=$3)
     `, [date, location, eventId]),
     headcountRows = await db.query(`
-      WITH reading_totals AS (
-        SELECT r.attendance_event_id,r.reading_number,
-               sum(r.main_church_count+r.children_count+r.teenager_count)::numeric AS total,
+      WITH group_averages AS (
+        SELECT r.attendance_event_id,coalesce(r.group_name,'Legacy') AS group_name,
+               round(avg(r.main_church_count+r.children_count+r.teenager_count))::int AS group_average,
                max(r.updated_at) AS updated_at
         FROM attendance_headcount_readings r
         JOIN attendance_events e ON e.id=r.attendance_event_id
         WHERE e.event_date=$1::date AND ($2='' OR e.location=$2)
           AND ($3::bigint=0 OR e.id=$3)
-        GROUP BY r.attendance_event_id,r.reading_number
+          AND (r.group_name IS NOT NULL OR NOT EXISTS (
+            SELECT 1 FROM attendance_headcount_readings newer
+            WHERE newer.attendance_event_id=r.attendance_event_id AND newer.group_name IS NOT NULL
+          ))
+        GROUP BY r.attendance_event_id,coalesce(r.group_name,'Legacy')
       ), event_averages AS (
-        SELECT attendance_event_id,round(avg(total))::int AS official,
-               count(*)::int AS reading_count,max(updated_at) AS updated_at
-        FROM reading_totals GROUP BY attendance_event_id
+        SELECT attendance_event_id,sum(group_average)::int AS official,
+               (SELECT count(*) FROM attendance_headcount_readings x WHERE x.attendance_event_id=group_averages.attendance_event_id)::int AS reading_count,
+               max(updated_at) AS updated_at
+        FROM group_averages GROUP BY attendance_event_id
       )
       SELECT coalesce(sum(official),0)::int AS total,max(updated_at) AS updated_at,
              coalesce(sum(reading_count),0)::int AS reading_count,
              count(*)::int AS event_count,
-             count(*) FILTER (WHERE reading_count=3)::int AS complete_events
+             count(*) FILTER (WHERE reading_count>0)::int AS complete_events
       FROM event_averages
     `, [date, location, eventId]),
     locationAttendanceRows = await db.query(`
@@ -215,17 +220,21 @@ async function summary(db, options = {}) {
       GROUP BY 1 ORDER BY 1
     `, [date, location, eventId]),
     headcountBreakdown = await db.query(`
-      WITH reading_totals AS (
-        SELECT e.id,e.location,r.reading_number,
-               sum(r.main_church_count+r.children_count+r.teenager_count)::numeric AS total
+      WITH group_averages AS (
+        SELECT e.id,e.location,coalesce(r.group_name,'Legacy') AS group_name,
+               round(avg(r.main_church_count+r.children_count+r.teenager_count))::int AS group_average
         FROM attendance_events e
         JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
         WHERE e.event_date=$1::date AND ($2='' OR e.location=$2)
           AND ($3::bigint=0 OR e.id=$3)
-        GROUP BY e.id,e.location,r.reading_number
+          AND (r.group_name IS NOT NULL OR NOT EXISTS (
+            SELECT 1 FROM attendance_headcount_readings newer
+            WHERE newer.attendance_event_id=r.attendance_event_id AND newer.group_name IS NOT NULL
+          ))
+        GROUP BY e.id,e.location,coalesce(r.group_name,'Legacy')
       ), event_averages AS (
-        SELECT id,location,round(avg(total))::int AS official
-        FROM reading_totals GROUP BY id,location
+        SELECT id,location,sum(group_average)::int AS official
+        FROM group_averages GROUP BY id,location
       )
       SELECT location,sum(official)::int AS room_total
       FROM event_averages GROUP BY location ORDER BY location
@@ -269,7 +278,7 @@ async function summary(db, options = {}) {
         ? "Location attendance"
         : roomAttendance
           ? Number(headcountRows[0]?.event_count || 0) === 1
-            ? `TED average · ${number(headcountRows[0]?.reading_count)}/3 counts`
+            ? `TED average · ${number(headcountRows[0]?.reading_count)} saved rows`
             : `TED averages · ${number(headcountRows[0]?.complete_events)}/${number(headcountRows[0]?.event_count)} services complete`
           : enteredAttendance
             ? "Service attendance"
