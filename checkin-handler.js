@@ -297,6 +297,28 @@ async function overview(db, body = {}) {
         )
       : [],
     summary = readingSummary(readings);
+  const locationSummary = service
+    ? await db.query(
+        `WITH event_totals AS (
+           SELECT e.id,e.location,
+                  round(avg(r.male_count+r.female_count+r.children_count+r.unassigned_count))::int AS official
+           FROM attendance_events e
+           LEFT JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
+           WHERE e.event_date=$1::date AND e.name=$2
+           GROUP BY e.id,e.location
+         ), identified AS (
+           SELECT location,count(*)::int AS identified
+           FROM checkin_events
+           WHERE service_date=$1::date AND service_label=$2
+           GROUP BY location
+         )
+         SELECT t.location,coalesce(t.official,0)::int AS official,
+                coalesce(i.identified,0)::int AS identified
+         FROM event_totals t LEFT JOIN identified i ON i.location=t.location
+         ORDER BY t.location`,
+        [date, service],
+      )
+    : [];
   return {
     date,
     today,
@@ -308,6 +330,11 @@ async function overview(db, body = {}) {
     service,
     headcounts: summary.readings,
     headcountSummary: summary,
+    locationSummary: locationSummary.map((row) => ({
+      location: row.location,
+      official: Number(row.official || 0),
+      identified: Number(row.identified || 0),
+    })),
     recent: rows.map((row) => {
       let changes = {};
       try {

@@ -82,7 +82,7 @@ test("TED selects services, records three counts and gets an official average", 
   await expect(page.getByLabel("Service or event")).toContainText("First Sunday Service");
   await expect(page.getByLabel("Service or event")).toContainText("Second Sunday Service");
   await expect(page.getByLabel("Service type")).toContainText("Sunday service");
-  await page.getByRole("button", { name: /Counts/ }).click();
+  await page.getByRole("button", { name: /Headcounts/ }).click();
 
   for (const [reading, values] of [[1, [100, 120, 30]], [2, [105, 125, 35]], [3, [98, 122, 32]]]) {
     await page.locator(`[data-reading="${reading}"]`).click();
@@ -96,13 +96,14 @@ test("TED selects services, records three counts and gets an official average", 
   await expect(page.getByText("3 counts complete")).toBeVisible();
   await expect(page.locator(".attendance-total > b")).toHaveText("256");
 
-  await page.getByRole("button", { name: /Events & imports/ }).click();
+  await page.getByRole("button", { name: /^Events/ }).click();
   await page.getByRole("button", { name: "+ Create event" }).click();
   await page.getByLabel("Name").fill("Growth Track");
   await page.getByLabel("Start time").fill("14:00");
   await page.getByRole("button", { name: "Create and select" }).click();
   await expect(page.getByLabel("Service or event")).toContainText("Growth Track");
 
+  await page.getByRole("button", { name: /^Imports/ }).click();
   await page.getByRole("button", { name: "Import Planning Center" }).click();
   await expect(page.getByText("1 Planning Center event added.")).toBeVisible();
   await expect(page.getByLabel("Service or event")).toContainText("Planning Center Conference");

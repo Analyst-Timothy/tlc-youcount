@@ -12,10 +12,11 @@ const state = {
   total: 0,
   locations: [],
   recent: [],
+  locationSummary: [],
   headcounts: [],
   headcountSummary: { readings: [], official: 0, provisional: true, spread: 0 },
   selectedReading: 1,
-  workspaceTab: localStorage.getItem("tlc_attendance_tab") || "checkin",
+  workspaceTab: localStorage.getItem("tlc_attendance_workspace_v2") || "overview",
   eventType: "all",
   showCreateEvent: false,
   importMessage: "",
@@ -90,6 +91,7 @@ async function loadOverview() {
   if (state.eventId) localStorage.setItem("tlc_welcome_event_id", String(state.eventId));
   localStorage.setItem("tlc_welcome_service", state.service);
   state.recent = data.recent || [];
+  state.locationSummary = data.locationSummary || [];
   state.headcounts = data.headcounts || [];
   state.headcountSummary = data.headcountSummary || { readings: [], official: 0, provisional: true, spread: 0 };
   const nextMissing = [1, 2, 3].find((reading) => !state.headcounts.some((item) => item.reading === reading));
@@ -172,15 +174,28 @@ function render() {
     selectedCount = state.headcounts.find((item) => item.reading === state.selectedReading),
     countSummary = state.headcountSummary || {},
     readings = countSummary.readings || state.headcounts,
-    varianceWarning = readings.length > 1 && countSummary.official && countSummary.spread / countSummary.official > 0.1;
+    varianceWarning = readings.length > 1 && countSummary.official && countSummary.spread / countSummary.official > 0.1,
+    official = Number(countSummary.official || 0),
+    identifiedPercent = official ? Math.min(100, Math.round((state.total / official) * 100)) : 0,
+    childrenAverage = readings.length
+      ? Math.round(readings.reduce((sum, item) => sum + Number(item.children || 0), 0) / readings.length)
+      : 0,
+    maxReading = Math.max(1, official, ...readings.map((item) => Number(item.total || 0))),
+    trendPoints = readings.map((item, index) => `${8 + index * 42},${72 - (Number(item.total || 0) / maxReading) * 58}`).join(" "),
+    locationRows = state.locationSummary.length
+      ? state.locationSummary
+      : [{ location: state.location, official, identified: state.total }],
+    locationTotal = locationRows.reduce((sum, item) => sum + Number(item.official || item.identified || 0), 0);
   const visibleEvents = state.eventType === "all"
       ? state.events
       : state.events.filter((event) => (event.eventType || "service") === state.eventType),
     tabs = [
-      ["checkin", "Check-in", "Scan cards"],
-      ["counts", "Counts", "Record headcounts"],
-      ["events", "Events & imports", "Set up services"],
-      ["history", "History", "Review arrivals"],
+      ["overview", "Overview", "Service dashboard"],
+      ["checkin", "Live Check-in", "Scan cards"],
+      ["counts", "Headcounts", "Record three counts"],
+      ["events", "Events", "Manage services"],
+      ["history", "Attendance History", "Review arrivals"],
+      ["imports", "Imports", "Bring in records"],
     ];
   root.innerHTML = `<div class="scanner-app"><header>${wordmark()}<div><span>${live ? "Identified in this service" : "Selected service"}</span><b>${state.total}</b><button id="logout" aria-label="Log out">×</button></div></header><main class="crm-layout">
     <aside class="crm-sidebar"><span class="kicker">Attendance CRM</span><nav>${tabs.map(([id, label, description]) => `<button type="button" data-workspace-tab="${id}" class="${state.workspaceTab === id ? "active" : ""}"><b>${label}</b><small>${description}</small></button>`).join("")}</nav><p>TED attendance workspace</p></aside><section class="crm-content">
@@ -190,7 +205,9 @@ function render() {
       <label>Service type<select id="serviceType"><option value="all">All service types</option>${Object.entries(eventTypeLabels).map(([value, label]) => `<option value="${value}" ${state.eventType === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>
       <label>Service or event<select id="service">${visibleEvents.map((event) => `<option value="${event.id}" ${Number(event.id) === state.eventId ? "selected" : ""}>${event.startsAt ? `${esc(event.startsAt)} · ` : ""}${esc(event.name)} · ${esc(eventTypeLabels[event.eventType] || "Church service")}</option>`).join("")}</select></label>
     </section>
-    ${state.workspaceTab === "events" ? `<section class="workspace-panel events-workspace"><header><div><span class="kicker">Events & imports</span><h1>Set up attendance</h1><p>Create services here, or bring them in from an existing source.</p></div></header><div class="event-actions"><button type="button" id="toggleCreateEvent">+ Create event</button><button type="button" id="importPlanningCenter">Import Planning Center</button><label class="file-action">Import history CSV<input id="historyImport" type="file" accept=".csv,text/csv"></label><a href="/attendance-history-template.csv" download>Download CSV template</a></div>${state.importMessage ? `<p class="event-message" role="status">${esc(state.importMessage)}</p>` : ""}${state.showCreateEvent ? `<section class="event-creator"><div><span class="kicker">New attendance event</span><h2>Create a service or event</h2></div><form id="createEventForm"><label>Name<input name="name" required placeholder="e.g. Midweek Service"></label><label>Start time<input name="startsAt" type="time"></label><label>End time<input name="endsAt" type="time"></label><label>Type<select name="eventType"><option value="sunday_service">Sunday service</option><option value="service">Church service</option><option value="conference">Conference</option><option value="event">Other event</option></select></label><button>Create and select</button><button type="button" class="quiet" id="cancelCreateEvent">Cancel</button></form></section>` : ""}<div class="event-library"><h2>Services on ${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</h2>${state.events.map((event) => `<button type="button" data-event-id="${event.id}" class="${Number(event.id) === state.eventId ? "active" : ""}"><span><b>${esc(event.name)}</b><small>${esc(event.location || state.location)} · ${esc(eventTypeLabels[event.eventType] || "Church service")}</small></span><strong>${esc(event.startsAt || "Time not set")}</strong></button>`).join("") || `<p class="empty">No events have been created for this date.</p>`}</div></section>` : ""}
+    ${state.workspaceTab === "overview" ? `<section class="operations-overview"><header class="overview-heading"><div><span class="kicker">TED workspace</span><h1>Attendance Operations</h1></div><div class="five-l-ribbon" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div></header><div class="live-service-banner"><span>${live ? "● Live" : "Selected"}</span><div><b>${esc(selectedEvent?.name || state.service)}</b><small>${esc(state.location)}${selectedEvent?.startsAt ? ` · ${esc(selectedEvent.startsAt)}` : ""} · ${esc(eventTypeLabels[selectedEvent?.eventType] || "Church service")}</small></div></div><div class="overview-metrics"><article><span>Official attendance</span><b>${official}</b><small>${countSummary.provisional ? "Provisional average" : "Three-count average"}</small></article><article><span>Identified check-ins</span><b>${state.total}</b><small>Cards checked in</small></article><article><span>Identification</span><b>${identifiedPercent}%</b><small>Of official attendance</small></article><article><span>Children</span><b>${childrenAverage}</b><small>Average across counts</small></article></div><section class="count-progress"><header><b>Three-point headcount</b><span>${readings.length}/3 recorded</span></header><div class="count-track">${[1,2,3].map((number) => { const item = readings.find((reading) => reading.reading === number), active = !item && number === Math.min(3, readings.length + 1); return `<button type="button" data-overview-reading="${number}" class="${item ? "done" : active ? "now" : "next"}"><i>${item ? "✓" : number}</i><b>Count ${number}</b><small>${item ? `${item.total} · Done` : active ? "Now" : "Next"}</small></button>`; }).join("")}</div></section><div class="overview-analysis"><section class="trend-card"><header><div><span class="kicker">Service counts</span><h2>Attendance trend</h2></div><strong>${official}</strong></header><svg viewBox="0 0 100 80" preserveAspectRatio="none" aria-label="Headcount trend"><line x1="8" y1="72" x2="92" y2="72"></line>${trendPoints ? `<polyline points="${trendPoints}"></polyline>${readings.map((item,index) => `<circle cx="${8 + index * 42}" cy="${72 - (Number(item.total || 0) / maxReading) * 58}" r="2.4"></circle>`).join("")}` : ""}</svg><div class="trend-labels">${readings.map((item) => `<span>Count ${item.reading}<b>${item.total}</b></span>`).join("") || `<p>No headcount has been recorded yet.</p>`}</div></section><section class="location-card"><header><span class="kicker">Service footprint</span><h2>Location split</h2></header><div class="location-total"><b>${locationTotal}</b><span>across ${locationRows.length} location${locationRows.length === 1 ? "" : "s"}</span></div><div class="location-bars">${locationRows.map((item,index) => { const value=Number(item.official || item.identified || 0), percentage=locationTotal ? Math.round(value/locationTotal*100) : 0; return `<article><i style="--share:${percentage}%;--bar-index:${index}"></i><div><b>${esc(item.location)}</b><span>${value} · ${percentage}%</span></div></article>`; }).join("")}</div></section></div></section>` : ""}
+    ${state.workspaceTab === "events" ? `<section class="workspace-panel events-workspace"><header><div><span class="kicker">Service calendar</span><h1>Events</h1><p>Create and select the service TED is recording.</p></div><button type="button" id="toggleCreateEvent">+ Create event</button></header>${state.importMessage ? `<p class="event-message" role="status">${esc(state.importMessage)}</p>` : ""}${state.showCreateEvent ? `<section class="event-creator"><div><span class="kicker">New attendance event</span><h2>Create a service or event</h2></div><form id="createEventForm"><label>Name<input name="name" required placeholder="e.g. Midweek Service"></label><label>Start time<input name="startsAt" type="time"></label><label>End time<input name="endsAt" type="time"></label><label>Type<select name="eventType"><option value="sunday_service">Sunday service</option><option value="service">Church service</option><option value="conference">Conference</option><option value="event">Other event</option></select></label><button>Create and select</button><button type="button" class="quiet" id="cancelCreateEvent">Cancel</button></form></section>` : ""}<div class="event-library"><h2>Services on ${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</h2>${state.events.map((event) => `<button type="button" data-event-id="${event.id}" class="${Number(event.id) === state.eventId ? "active" : ""}"><span><b>${esc(event.name)}</b><small>${esc(event.location || state.location)} · ${esc(eventTypeLabels[event.eventType] || "Church service")}</small></span><strong>${esc(event.startsAt || "Time not set")}</strong></button>`).join("") || `<p class="empty">No events have been created for this date.</p>`}</div></section>` : ""}
+    ${state.workspaceTab === "imports" ? `<section class="workspace-panel imports-workspace"><header><div><span class="kicker">Attendance data</span><h1>Imports</h1><p>Bring services or historical attendance into the workspace.</p></div></header><div class="import-options"><article><i>PC</i><div><b>Planning Center</b><span>Import available services and event times.</span></div><button type="button" id="importPlanningCenter">Import Planning Center</button></article><article><i>CSV</i><div><b>Attendance history</b><span>Upload the TLC attendance history template.</span></div><label class="file-action">Import history CSV<input id="historyImport" type="file" accept=".csv,text/csv"></label></article><article><i>↓</i><div><b>CSV template</b><span>Download the correctly formatted spreadsheet.</span></div><a href="/attendance-history-template.csv" download>Download CSV template</a></article></div>${state.importMessage ? `<p class="event-message" role="status">${esc(state.importMessage)}</p>` : ""}</section>` : ""}
     ${state.workspaceTab === "checkin" ? (live ? `<section class="camera-card"><header class="selected-service"><span class="kicker">Now recording</span><b>${esc(selectedEvent?.name || state.service)}</b><small>${esc(state.location)} · ${esc(eventTypeLabels[selectedEvent?.eventType] || "Church service")}${selectedEvent?.startsAt ? ` · ${esc(selectedEvent.startsAt)}` : ""}</small></header><div class="camera-frame"><video id="camera" playsinline muted></video><div class="scan-guide"><i></i><span>Place QR code here</span></div></div><div class="camera-actions"><button id="cameraToggle">Start camera</button><span id="cameraStatus">Camera is off</span></div><form id="manualScan"><input id="code" autocomplete="off" autocapitalize="characters" placeholder="Or scan/type 482193"><button>Check in</button></form>${resultMarkup()}</section>` : `<section class="camera-card history-mode"><span class="kicker">Attendance history</span><h1>${new Date(`${state.date}T12:00:00`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</h1><p>Scanning is disabled while viewing an earlier date. Counts and identified check-ins remain available.</p><button id="returnToday">Return to today</button></section>`) : ""}
     ${state.workspaceTab === "counts" ? `<aside class="attendance-panel"><div class="attendance-heading"><span class="kicker">Official attendance</span><em class="${countSummary.provisional ? "provisional" : "complete"}">${countSummary.provisional ? "Provisional" : "3 counts complete"}</em></div><div class="attendance-total"><b>${countSummary.official || 0}</b><span>average of ${readings.length || 0} count${readings.length === 1 ? "" : "s"}<br>${state.total} identified check-ins</span></div>
       ${varianceWarning ? `<div class="variance-warning">Counts vary by ${countSummary.spread}. Review them before closing the service.</div>` : ""}
@@ -207,9 +224,17 @@ function bind() {
     button.onclick = async () => {
       await stopCamera();
       state.workspaceTab = button.dataset.workspaceTab;
-      localStorage.setItem("tlc_attendance_tab", state.workspaceTab);
+      localStorage.setItem("tlc_attendance_workspace_v2", state.workspaceTab);
       render();
       if (state.workspaceTab === "checkin" && state.date === todayInLondon()) await startCamera();
+    };
+  });
+  document.querySelectorAll("[data-overview-reading]").forEach((button) => {
+    button.onclick = async () => {
+      state.selectedReading = Number(button.dataset.overviewReading);
+      state.workspaceTab = "counts";
+      localStorage.setItem("tlc_attendance_workspace_v2", "counts");
+      render();
     };
   });
   document.querySelector("#historyDate").onchange = async (event) => {
