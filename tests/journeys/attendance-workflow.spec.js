@@ -50,11 +50,10 @@ test("TED selects services, records three counts and gets an official average", 
       const item = {
         id: Number(body.reading),
         reading: Number(body.reading),
-        male: Number(body.male || 0),
-        female: Number(body.female || 0),
+        mainChurch: Number(body.mainChurch || 0),
         children: Number(body.children || 0),
-        unassigned: 0,
-        total: Number(body.male || 0) + Number(body.female || 0) + Number(body.children || 0),
+        teenagers: Number(body.teenagers || 0),
+        total: Number(body.mainChurch || 0) + Number(body.children || 0) + Number(body.teenagers || 0),
         notes: body.notes || "",
         recordedAt: new Date().toISOString(),
       };
@@ -84,11 +83,11 @@ test("TED selects services, records three counts and gets an official average", 
   await expect(page.getByLabel("Service type")).toContainText("Sunday service");
   await page.getByRole("button", { name: /Headcounts/ }).click();
 
-  for (const [reading, values] of [[1, [100, 120, 30]], [2, [105, 125, 35]], [3, [98, 122, 32]]]) {
+  for (const [reading, values] of [[1, [200, 30, 20]], [2, [210, 35, 20]], [3, [202, 30, 20]]]) {
     await page.locator(`[data-reading="${reading}"]`).click();
-    await page.getByLabel("Male", { exact: true }).fill(String(values[0]));
-    await page.getByLabel("Female", { exact: true }).fill(String(values[1]));
-    await page.getByLabel("Children", { exact: true }).fill(String(values[2]));
+    await page.getByLabel("Main Church", { exact: true }).fill(String(values[0]));
+    await page.getByLabel("Children", { exact: true }).fill(String(values[1]));
+    await page.getByLabel("Teenagers", { exact: true }).fill(String(values[2]));
     await page.getByRole("button", { name: `Save Count ${reading}` }).click();
     await expect(page.locator(`[data-reading="${reading}"] b`)).toHaveText(String(values[0] + values[1] + values[2]));
   }

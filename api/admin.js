@@ -341,8 +341,8 @@ module.exports = async function handler(req, res) {
           [date, locationFilter],
         ),
         headcountRows = await db.query(
-          `SELECT location,service_label,male_count,female_count,children_count,
-                  (male_count+female_count+children_count)::int AS total,updated_at
+          `SELECT location,service_label,main_church_count,children_count,teenager_count,
+                  (main_church_count+children_count+teenager_count)::int AS total,updated_at
            FROM attendance_headcounts WHERE service_date=$1::date
              AND ($2='' OR location=$2) AND ($3='' OR service_label=$3)
            ORDER BY location,service_label`,
@@ -394,9 +394,9 @@ module.exports = async function handler(req, res) {
         headcounts: headcountRows.map((row) => ({
           location: row.location,
           service: row.service_label,
-          male: Number(row.male_count || 0),
-          female: Number(row.female_count || 0),
+          mainChurch: Number(row.main_church_count || 0),
           children: Number(row.children_count || 0),
+          teenagers: Number(row.teenager_count || 0),
           total: Number(row.total || 0),
           updatedAt: row.updated_at,
         })),

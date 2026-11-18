@@ -1,4 +1,4 @@
-date,location,service,start time,reading,total,male,female,children,notes
-2026-11-15,North London,First Sunday Service,09:00,1,420,,,,Historical spreadsheet total
-2026-11-15,North London,First Sunday Service,09:00,2,438,,,,Historical spreadsheet total
-2026-11-15,North London,First Sunday Service,09:00,3,429,,,,Historical spreadsheet total
+date,location,service,start time,reading,main church,children,teenagers,notes
+2026-11-15,North London,First Sunday Service,09:00,1,340,48,32,Historical attendance count
+2026-11-15,North London,First Sunday Service,09:00,2,352,51,35,Historical attendance count
+2026-11-15,North London,First Sunday Service,09:00,3,346,49,34,Historical attendance count

@@ -113,15 +113,19 @@ function readingSummary(rows = []) {
     const male = Number(row.male_count || 0),
       female = Number(row.female_count || 0),
       children = Number(row.children_count || 0),
-      unassigned = Number(row.unassigned_count || 0);
+      unassigned = Number(row.unassigned_count || 0),
+      mainChurch = Number(row.main_church_count || 0) || male + female + unassigned,
+      teenagers = Number(row.teenager_count || 0);
     return {
       id: Number(row.id),
       reading: Number(row.reading_number),
       male,
       female,
       children,
+      mainChurch,
+      teenagers,
       unassigned,
-      total: male + female + children + unassigned,
+      total: mainChurch + children + teenagers,
       notes: row.notes || "",
       device: row.device_label || "",
       recordedAt: row.recorded_at,
@@ -195,23 +199,27 @@ async function saveReading(db, event, details = {}) {
     female = Math.max(0, Math.min(50000, Math.round(Number(details.female) || 0))),
     children = Math.max(0, Math.min(50000, Math.round(Number(details.children) || 0))),
     unassigned = Math.max(0, Math.min(50000, Math.round(Number(details.unassigned) || 0))),
+    mainChurch = Math.max(0, Math.min(50000, Math.round(Number(details.mainChurch) || male + female + unassigned))),
+    teenagers = Math.max(0, Math.min(50000, Math.round(Number(details.teenagers) || 0))),
     notes = String(details.notes || "").trim().slice(0, 300),
     device = clean(details.device, 60) || "Attendance team device";
-  if (male + female + children + unassigned < 1)
+  if (mainChurch + children + teenagers < 1)
     throw new Error("attendance_count_required");
   await db.query(
     `INSERT INTO attendance_headcount_readings(
        attendance_event_id,reading_number,male_count,female_count,children_count,
-       unassigned_count,notes,device_label
-     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
+       unassigned_count,main_church_count,teenager_count,notes,device_label
+     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT(attendance_event_id,reading_number) DO UPDATE SET
        male_count=excluded.male_count,female_count=excluded.female_count,
        children_count=excluded.children_count,unassigned_count=excluded.unassigned_count,
+       main_church_count=excluded.main_church_count,teenager_count=excluded.teenager_count,
        notes=excluded.notes,device_label=excluded.device_label,recorded_at=now(),updated_at=now()`,
-    [event.id, reading, male, female, children, unassigned, notes || null, device],
+    [event.id, reading, 0, 0, children, 0, mainChurch, teenagers, notes || null, device],
   );
   const rows = await db.query(
     `SELECT id,reading_number,male_count,female_count,children_count,unassigned_count,
+            main_church_count,teenager_count,
             notes,device_label,recorded_at,updated_at
      FROM attendance_headcount_readings WHERE attendance_event_id=$1 ORDER BY reading_number`,
     [event.id],
@@ -224,14 +232,15 @@ async function saveReading(db, event, details = {}) {
   await db.query(
     `INSERT INTO attendance_headcounts(
        service_date,location,service_label,male_count,female_count,children_count,
-       notes,device_label
-     ) VALUES($1::date,$2,$3,$4,$5,$6,$7,$8)
+       main_church_count,teenager_count,notes,device_label
+     ) VALUES($1::date,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      ON CONFLICT(service_date,location,service_label) DO UPDATE SET
        male_count=excluded.male_count,female_count=excluded.female_count,
        children_count=excluded.children_count,notes=excluded.notes,
+       main_church_count=excluded.main_church_count,teenager_count=excluded.teenager_count,
        device_label=excluded.device_label,updated_at=now()`,
-    [event.event_date, event.location, event.name, average("male_count"), average("female_count"),
-      average("children_count") + average("unassigned_count"),
+    [event.event_date, event.location, event.name, 0, 0,
+      average("children_count"),average("main_church_count"),average("teenager_count"),
       `Official average of ${rows.length} count${rows.length === 1 ? "" : "s"}${notes ? ` · ${notes}` : ""}`,
       device],
   );
@@ -290,7 +299,7 @@ async function overview(db, body = {}) {
     readings = selectedEventId
       ? await db.query(
           `SELECT id,reading_number,male_count,female_count,children_count,
-                  unassigned_count,notes,device_label,recorded_at,updated_at
+                  unassigned_count,main_church_count,teenager_count,notes,device_label,recorded_at,updated_at
            FROM attendance_headcount_readings
            WHERE attendance_event_id=$1 ORDER BY reading_number`,
           [selectedEventId],
@@ -301,7 +310,7 @@ async function overview(db, body = {}) {
     ? await db.query(
         `WITH event_totals AS (
            SELECT e.id,e.location,
-                  round(avg(r.male_count+r.female_count+r.children_count+r.unassigned_count))::int AS official
+                  round(avg(r.main_church_count+r.children_count+r.teenager_count))::int AS official
            FROM attendance_events e
            LEFT JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
            WHERE e.event_date=$1::date AND e.name=$2
@@ -459,10 +468,9 @@ module.exports = async function handler(req, res) {
           });
           await saveReading(db, event, {
             reading: item.reading || 1,
-            male: item.male,
-            female: item.female,
+            mainChurch: item.mainChurch || (Number(item.male || 0) + Number(item.female || 0)) || item.total,
             children: item.children,
-            unassigned: item.total && !item.male && !item.female && !item.children ? item.total : item.unassigned,
+            teenagers: item.teenagers,
             notes: item.notes,
             device: "Historical spreadsheet import",
           });

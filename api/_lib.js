@@ -421,12 +421,16 @@ async function migrateDb() {
     male_count integer NOT NULL DEFAULT 0,
     female_count integer NOT NULL DEFAULT 0,
     children_count integer NOT NULL DEFAULT 0,
+    main_church_count integer NOT NULL DEFAULT 0,
+    teenager_count integer NOT NULL DEFAULT 0,
     notes text,
     device_label text,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE(service_date,location,service_label)
   )`);
+  await db.query(`ALTER TABLE attendance_headcounts ADD COLUMN IF NOT EXISTS main_church_count integer NOT NULL DEFAULT 0`);
+  await db.query(`ALTER TABLE attendance_headcounts ADD COLUMN IF NOT EXISTS teenager_count integer NOT NULL DEFAULT 0`);
   await db.query(
     `CREATE INDEX IF NOT EXISTS attendance_headcounts_service_idx
      ON attendance_headcounts(service_date,location,service_label)`,
@@ -438,6 +442,8 @@ async function migrateDb() {
     male_count integer NOT NULL DEFAULT 0 CHECK (male_count >= 0),
     female_count integer NOT NULL DEFAULT 0 CHECK (female_count >= 0),
     children_count integer NOT NULL DEFAULT 0 CHECK (children_count >= 0),
+    main_church_count integer NOT NULL DEFAULT 0 CHECK (main_church_count >= 0),
+    teenager_count integer NOT NULL DEFAULT 0 CHECK (teenager_count >= 0),
     unassigned_count integer NOT NULL DEFAULT 0 CHECK (unassigned_count >= 0),
     notes text,
     device_label text,
@@ -449,6 +455,14 @@ async function migrateDb() {
     `ALTER TABLE attendance_headcount_readings
      ADD COLUMN IF NOT EXISTS unassigned_count integer NOT NULL DEFAULT 0 CHECK (unassigned_count >= 0)`,
   );
+  await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS main_church_count integer NOT NULL DEFAULT 0 CHECK (main_church_count >= 0)`);
+  await db.query(`ALTER TABLE attendance_headcount_readings ADD COLUMN IF NOT EXISTS teenager_count integer NOT NULL DEFAULT 0 CHECK (teenager_count >= 0)`);
+  await db.query(`UPDATE attendance_headcount_readings
+    SET main_church_count=male_count+female_count+unassigned_count
+    WHERE main_church_count=0 AND (male_count+female_count+unassigned_count)>0`);
+  await db.query(`UPDATE attendance_headcounts
+    SET main_church_count=male_count+female_count
+    WHERE main_church_count=0 AND (male_count+female_count)>0`);
   await db.query(
     `CREATE INDEX IF NOT EXISTS attendance_headcount_readings_event_idx
      ON attendance_headcount_readings(attendance_event_id,reading_number)`,
@@ -466,9 +480,10 @@ async function migrateDb() {
   await db.query(`
     INSERT INTO attendance_headcount_readings(
       attendance_event_id,reading_number,male_count,female_count,children_count,unassigned_count,
-      notes,device_label,recorded_at,updated_at
+      main_church_count,teenager_count,notes,device_label,recorded_at,updated_at
     )
     SELECT e.id,1,h.male_count,h.female_count,h.children_count,0,
+      h.male_count+h.female_count,0,
       h.notes,h.device_label,h.created_at,h.updated_at
     FROM attendance_headcounts h
     JOIN attendance_events e ON e.event_date=h.service_date

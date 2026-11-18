@@ -115,9 +115,9 @@ test("TED attendance keeps three readings and calculates the rounded average", (
     ]),
     {
       readings: [
-        { id: 1, reading: 1, male: 100, female: 120, children: 30, unassigned: 0, total: 250, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
-        { id: 2, reading: 2, male: 105, female: 125, children: 35, unassigned: 0, total: 265, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
-        { id: 3, reading: 3, male: 98, female: 122, children: 32, unassigned: 0, total: 252, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 1, reading: 1, male: 100, female: 120, children: 30, mainChurch: 220, teenagers: 0, unassigned: 0, total: 250, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 2, reading: 2, male: 105, female: 125, children: 35, mainChurch: 230, teenagers: 0, unassigned: 0, total: 265, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
+        { id: 3, reading: 3, male: 98, female: 122, children: 32, mainChurch: 220, teenagers: 0, unassigned: 0, total: 252, notes: "", device: "", recordedAt: undefined, updatedAt: undefined },
       ],
       official: 256,
       provisional: false,
@@ -158,6 +158,8 @@ test("attendance operations use a branded command centre with separated CRM tabs
   assert.match(checkinUi, /Attendance Operations/);
   assert.match(checkinUi, /Official attendance/);
   assert.match(checkinUi, /Location split/);
+  assert.match(checkinUi, /Main Church/);
+  assert.match(checkinUi, /Teenagers/);
   assert.match(checkinUi, /id="serviceType"/);
   assert.match(checkinUi, /sunday_service: "Sunday service"/);
   assert.match(adminApi, /FROM attendance_events/);

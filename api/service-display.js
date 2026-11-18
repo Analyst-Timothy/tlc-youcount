@@ -139,7 +139,7 @@ async function summary(db, options = {}) {
     headcountRows = await db.query(`
       WITH reading_totals AS (
         SELECT r.attendance_event_id,r.reading_number,
-               sum(r.male_count+r.female_count+r.children_count+r.unassigned_count)::numeric AS total,
+               sum(r.main_church_count+r.children_count+r.teenager_count)::numeric AS total,
                max(r.updated_at) AS updated_at
         FROM attendance_headcount_readings r
         JOIN attendance_events e ON e.id=r.attendance_event_id
@@ -217,7 +217,7 @@ async function summary(db, options = {}) {
     headcountBreakdown = await db.query(`
       WITH reading_totals AS (
         SELECT e.id,e.location,r.reading_number,
-               sum(r.male_count+r.female_count+r.children_count+r.unassigned_count)::numeric AS total
+               sum(r.main_church_count+r.children_count+r.teenager_count)::numeric AS total
         FROM attendance_events e
         JOIN attendance_headcount_readings r ON r.attendance_event_id=e.id
         WHERE e.event_date=$1::date AND ($2='' OR e.location=$2)

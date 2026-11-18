@@ -121,7 +121,8 @@ function parseCsv(text) {
     service: "service", event: "service", "service name": "service",
     reading: "reading", round: "reading", count: "total", total: "total",
     male: "male", men: "male", female: "female", women: "female",
-    children: "children", kids: "children", notes: "notes",
+    "main church": "mainChurch", adults: "mainChurch",
+    children: "children", kids: "children", teenagers: "teenagers", teens: "teenagers", notes: "notes",
     "start time": "startTime", time: "startTime",
   };
   const headers = records[0].map((header) => aliases[header.toLowerCase()] || header);
@@ -180,12 +181,26 @@ function render() {
     childrenAverage = readings.length
       ? Math.round(readings.reduce((sum, item) => sum + Number(item.children || 0), 0) / readings.length)
       : 0,
+    teenagersAverage = readings.length
+      ? Math.round(readings.reduce((sum, item) => sum + Number(item.teenagers || 0), 0) / readings.length)
+      : 0,
+    mainChurchAverage = readings.length
+      ? Math.round(readings.reduce((sum, item) => sum + Number(item.mainChurch || 0), 0) / readings.length)
+      : 0,
     maxReading = Math.max(1, official, ...readings.map((item) => Number(item.total || 0))),
     trendPoints = readings.map((item, index) => `${8 + index * 42},${72 - (Number(item.total || 0) / maxReading) * 58}`).join(" "),
     locationRows = state.locationSummary.length
       ? state.locationSummary
       : [{ location: state.location, official, identified: state.total }],
     locationTotal = locationRows.reduce((sum, item) => sum + Number(item.official || item.identified || 0), 0);
+  let locationCursor = 0;
+  const locationColors = ["#003264", "#f0a500", "#3b82f6", "#16a34a", "#7c3aed", "#e84b4b"],
+    locationGradient = locationRows.map((item, index) => {
+      const start = locationCursor,
+        share = locationTotal ? (Number(item.official || item.identified || 0) / locationTotal) * 100 : 0;
+      locationCursor += share;
+      return `${locationColors[index % locationColors.length]} ${start}% ${locationCursor}%`;
+    }).join(",");
   const visibleEvents = state.eventType === "all"
       ? state.events
       : state.events.filter((event) => (event.eventType || "service") === state.eventType),
@@ -212,11 +227,19 @@ function render() {
     ${state.workspaceTab === "counts" ? `<aside class="attendance-panel"><div class="attendance-heading"><span class="kicker">Official attendance</span><em class="${countSummary.provisional ? "provisional" : "complete"}">${countSummary.provisional ? "Provisional" : "3 counts complete"}</em></div><div class="attendance-total"><b>${countSummary.official || 0}</b><span>average of ${readings.length || 0} count${readings.length === 1 ? "" : "s"}<br>${state.total} identified check-ins</span></div>
       ${varianceWarning ? `<div class="variance-warning">Counts vary by ${countSummary.spread}. Review them before closing the service.</div>` : ""}
       <div class="reading-tabs">${[1, 2, 3].map((number) => { const item = readings.find((reading) => reading.reading === number); return `<button type="button" data-reading="${number}" class="${state.selectedReading === number ? "active" : ""} ${item ? "saved" : ""}"><span>Count ${number}</span><b>${item?.total ?? "—"}</b><small>${item ? new Date(item.recordedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "Not recorded"}</small></button>`; }).join("")}</div>
-      ${live ? `<form id="headcountForm"><input type="hidden" name="reading" value="${state.selectedReading}"><div><label>Male<input name="male" type="number" min="0" max="50000" value="${selectedCount?.male ?? ""}" placeholder="0"></label><label>Female<input name="female" type="number" min="0" max="50000" value="${selectedCount?.female ?? ""}" placeholder="0"></label><label>Children<input name="children" type="number" min="0" max="50000" value="${selectedCount?.children ?? ""}" placeholder="0"></label></div><label>Count notes<textarea name="notes" rows="2" maxlength="300" placeholder="Optional">${esc(selectedCount?.notes || "")}</textarea></label><button>Save Count ${state.selectedReading}</button><p id="headcountStatus"></p></form>` : ""}
-      <div class="headcount-history"><b>${countSummary.provisional ? "Awaiting all 3 counts" : `Official average ${countSummary.official}`}</b><span>${readings.length ? `Range ${countSummary.lowest}–${countSummary.highest}` : "No manual count saved yet"}</span>${readings.map((item) => `<p><strong>Count ${item.reading} · ${item.total}</strong><span>${item.male} male · ${item.female} female · ${item.children} children${item.unassigned ? ` · ${item.unassigned} unassigned` : ""}</span></p>`).join("")}</div>
+      ${live ? `<form id="headcountForm"><input type="hidden" name="reading" value="${state.selectedReading}"><div><label>Main Church<input name="mainChurch" type="number" min="0" max="50000" value="${selectedCount?.mainChurch ?? ""}" placeholder="0"></label><label>Children<input name="children" type="number" min="0" max="50000" value="${selectedCount?.children ?? ""}" placeholder="0"></label><label>Teenagers<input name="teenagers" type="number" min="0" max="50000" value="${selectedCount?.teenagers ?? ""}" placeholder="0"></label></div><p class="counting-note">Count each person once, in the area where they are seated: Main Church, Children or Teenagers.</p><label>Count notes<textarea name="notes" rows="2" maxlength="300" placeholder="Optional">${esc(selectedCount?.notes || "")}</textarea></label><button>Save Count ${state.selectedReading}</button><p id="headcountStatus"></p></form>` : ""}
+      <div class="headcount-history"><b>${countSummary.provisional ? "Awaiting all 3 counts" : `Official average ${countSummary.official}`}</b><span>${readings.length ? `Range ${countSummary.lowest}–${countSummary.highest}` : "No manual count saved yet"}</span>${readings.map((item) => `<p><strong>Count ${item.reading} · ${item.total}</strong><span>${item.mainChurch} main church · ${item.children} children · ${item.teenagers} teenagers</span></p>`).join("")}</div>
     </aside>` : ""}
     ${state.workspaceTab === "history" ? `<section class="recent"><div><span class="kicker">${live ? "Live arrivals" : "Attendance record"}</span><h2>${live ? "Recently checked in" : "Recorded check-ins"}</h2></div>${state.recent.slice(0, 100).map((item) => `<article>${item.photoRecordId ? `<img src="/api/photo?record=${encodeURIComponent(item.photoRecordId)}" alt="">` : `<i>${esc(item.name[0])}</i>`}<div><b>${esc(item.name)}</b><span>${esc(item.service)} · ${new Date(item.checkedInAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span></div><strong>✓</strong></article>`).join("") || `<p class="empty">No check-ins match this service.</p>`}</section>` : ""}
   </section></main>${confirmationOverlay()}</div>`;
+  if (state.workspaceTab === "overview") {
+    const metrics = document.querySelector(".overview-metrics"),
+      existingAgeCard = metrics?.lastElementChild;
+    if (existingAgeCard) existingAgeCard.innerHTML = `<span>Main Church</span><b>${mainChurchAverage}</b><small>Average across counts</small>`;
+    metrics?.insertAdjacentHTML("beforeend", `<article><span>Children</span><b>${childrenAverage}</b><small>Average across counts</small></article><article><span>Teenagers</span><b>${teenagersAverage}</b><small>Average across counts</small></article>`);
+    const locationCard = document.querySelector(".location-card");
+    if (locationCard) locationCard.innerHTML = `<header><div><span class="kicker">Service footprint</span><h2>Location split</h2></div></header><div class="location-chart"><div class="location-donut" style="--segments:conic-gradient(${locationGradient || "#dfe6ec 0 100%"})"><span><b>${locationTotal}</b>Total</span></div><div class="location-legend">${locationRows.map((item,index) => { const value=Number(item.official || item.identified || 0), percentage=locationTotal ? Math.round(value/locationTotal*100) : 0; return `<article><i style="background:${locationColors[index % locationColors.length]}"></i><b>${esc(item.location)}</b><span>${value}</span><small>${percentage}%</small></article>`; }).join("")}</div></div>`;
+  }
   bind();
 }
 function bind() {
@@ -387,7 +410,7 @@ function bind() {
         const data = await request("headcount", {
           date: state.date, location: state.location, service: state.service, eventId: state.eventId,
           reading: values.get("reading"),
-          male: values.get("male"), female: values.get("female"), children: values.get("children"),
+          mainChurch: values.get("mainChurch"), children: values.get("children"), teenagers: values.get("teenagers"),
           notes: values.get("notes"), device: navigator.userAgent.includes("Mobile") ? "Attendance team phone" : "Attendance desk",
         });
         state.headcounts = data.headcounts || [];
