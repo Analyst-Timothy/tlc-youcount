@@ -213,7 +213,7 @@ function render() {
       ["imports", "Imports", "Bring in records"],
     ];
   root.innerHTML = `<div class="scanner-app"><header>${wordmark()}<div><span>${live ? "Identified in this service" : "Selected service"}</span><b>${state.total}</b><button id="logout" aria-label="Log out">×</button></div></header><main class="crm-layout">
-    <aside class="crm-sidebar"><span class="kicker">Attendance CRM</span><nav>${tabs.map(([id, label, description]) => `<button type="button" data-workspace-tab="${id}" class="${state.workspaceTab === id ? "active" : ""}"><b>${label}</b><small>${description}</small></button>`).join("")}</nav><p>TED attendance workspace</p></aside><section class="crm-content">
+    <aside class="crm-sidebar"><nav>${tabs.map(([id, label, description]) => `<button type="button" data-workspace-tab="${id}" class="${state.workspaceTab === id ? "active" : ""}"><b>${label}</b><small>${description}</small></button>`).join("")}</nav><p>TED attendance workspace</p></aside><section class="crm-content">
     <section class="service-settings">
       <label>Calendar date<input id="historyDate" type="date" value="${esc(state.date)}"></label>
       <label>Location<select id="location">${state.locations.map((location) => `<option ${location === state.location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label>
