@@ -118,6 +118,7 @@ test("TED records unlimited spreadsheet headcounts and gets a group average", as
   await page.getByRole("button", { name:"Apply", exact:true }).click();
   await expect(page.getByRole("button", { name:"Clear date" })).toBeEnabled();
   await page.getByRole("button", { name:"Clear date" }).click();
+  await expect(page.getByRole("button", { name:"Clear date" })).toBeDisabled();
   await page.locator('#analyticsFilters select[name="period"]').selectOption("quarterly");
   await page.getByRole("button", { name:"Apply", exact:true }).click();
   await expect(page.getByText("Quarter by quarter")).toBeVisible();
