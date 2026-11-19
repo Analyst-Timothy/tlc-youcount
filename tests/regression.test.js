@@ -152,9 +152,14 @@ test("attendance events connect scans, counts, dashboards and imports", () => {
   assert.match(handler, /action === "createEvent"/);
   assert.match(handler, /action === "importPlanningCenter"/);
   assert.match(handler, /action === "importHistory"/);
+  assert.match(handler, /action === "analytics"/);
+  assert.match(handler, /date_trunc\(\$5,event_date\)/);
   assert.match(handler, /attendance_event_id\n\s*\)/);
   assert.match(checkinUi, /Headcount register/);
   assert.match(checkinUi, /name="counterName"/);
+  assert.match(checkinUi, /Month on month · 12 months/);
+  assert.match(checkinUi, /All locations/);
+  assert.match(checkinUi, /Clear date/);
   assert.match(checkinUi, /Import Planning Center/);
   assert.match(checkinUi, /Import history CSV/);
   assert.match(displayApi, /availableEvents/);

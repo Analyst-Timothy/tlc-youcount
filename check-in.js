@@ -15,6 +15,11 @@ const state = {
   locationSummary: [],
   headcounts: [],
   headcountSummary: { readings: [], official: 0, provisional: true, spread: 0 },
+  analytics: { total:0, serviceCount:0, average:0, peak:null, periods:[], locations:[], services:[], records:[] },
+  analyticsPeriod: localStorage.getItem("tlc_attendance_analysis_period") || "monthly",
+  analyticsDate: "",
+  analyticsLocation: "",
+  analyticsService: "",
   selectedReading: 1,
   workspaceTab: localStorage.getItem("tlc_attendance_workspace_v2") || "overview",
   eventType: "all",
@@ -68,6 +73,7 @@ function loginView(message = "") {
       await request("login", { pin: document.querySelector("#pin").value });
       state.authenticated = true;
       await loadOverview();
+      await loadAnalytics();
       render();
       await startCamera();
     } catch (error) {
@@ -96,6 +102,15 @@ async function loadOverview() {
   state.headcountSummary = data.headcountSummary || { readings: [], official: 0, provisional: true, spread: 0 };
   const nextMissing = [1, 2, 3].find((reading) => !state.headcounts.some((item) => item.reading === reading));
   if (nextMissing) state.selectedReading = nextMissing;
+}
+async function loadAnalytics() {
+  const data = await request("analytics", {
+    period: state.analyticsPeriod,
+    date: state.analyticsDate,
+    location: state.analyticsLocation,
+    service: state.analyticsService,
+  });
+  state.analytics = data.analytics || state.analytics;
 }
 
 function parseCsv(text) {
@@ -168,6 +183,34 @@ function playScanSound(kind) {
     });
   } catch {}
 }
+function analysisPeriodLabel(value) {
+  const date = new Date(`${value}T12:00:00`);
+  if (state.analyticsPeriod === "quarterly") return `Q${Math.floor(date.getMonth()/3)+1} ${date.getFullYear()}`;
+  if (state.analyticsPeriod === "weekly") return date.toLocaleDateString("en-GB",{day:"numeric",month:"short"});
+  if (state.analyticsPeriod === "monthly") return date.toLocaleDateString("en-GB",{month:"short",year:"2-digit"});
+  return String(date.getFullYear());
+}
+function analyticsMarkup(detailed = false) {
+  const data = state.analytics || {},
+    periods = data.periods || [],
+    locations = data.locations || [],
+    records = data.records || [],
+    maxPeriod = Math.max(1,...periods.map((item) => Number(item.attendance || 0))),
+    serviceNames = [...new Set(["First Sunday Service","Second Sunday Service",...state.events.map((event) => event.name)])];
+  return `<section class="attendance-analytics ${detailed ? "detailed" : ""}">
+    <form class="analytics-filters" id="analyticsFilters">
+      <label>Exact date <input name="date" type="date" value="${esc(state.analyticsDate)}"></label>
+      <button type="button" class="clear-analysis-date" ${state.analyticsDate ? "" : "disabled"}>Clear date</button>
+      <label>Analysis <select name="period"><option value="weekly" ${state.analyticsPeriod === "weekly" ? "selected" : ""}>Week on week · 12 weeks</option><option value="monthly" ${state.analyticsPeriod === "monthly" ? "selected" : ""}>Month on month · 12 months</option><option value="quarterly" ${state.analyticsPeriod === "quarterly" ? "selected" : ""}>Quarterly · 8 quarters</option><option value="yearly" ${state.analyticsPeriod === "yearly" ? "selected" : ""}>Year on year</option><option value="all" ${state.analyticsPeriod === "all" ? "selected" : ""}>All history</option></select></label>
+      <label>Location <select name="location"><option value="">All locations</option>${state.locations.map((location) => `<option value="${esc(location)}" ${state.analyticsLocation === location ? "selected" : ""}>${esc(location)}</option>`).join("")}</select></label>
+      <label>Service <select name="service"><option value="">All services</option>${serviceNames.map((service) => `<option value="${esc(service)}" ${state.analyticsService === service ? "selected" : ""}>${esc(service)}</option>`).join("")}</select></label>
+      <button>Apply</button>
+    </form>
+    <div class="analytics-metrics"><article><span>Total attendance</span><b>${Number(data.total || 0).toLocaleString()}</b><small>Across the selected records</small></article><article><span>Average service</span><b>${Number(data.average || 0).toLocaleString()}</b><small>${Number(data.serviceCount || 0)} services counted</small></article><article><span>Peak attendance</span><b>${Number(data.peak?.attendance || 0).toLocaleString()}</b><small>${data.peak ? `${esc(data.peak.location)} · ${esc(data.peak.date)}` : "No attendance yet"}</small></article></div>
+    <div class="analytics-grid"><section class="analytics-trend"><header><div><span class="kicker">Attendance trend</span><h2>${state.analyticsDate ? "Selected date" : state.analyticsPeriod === "quarterly" ? "Quarter by quarter" : state.analyticsPeriod === "weekly" ? "Week by week" : state.analyticsPeriod === "yearly" || state.analyticsPeriod === "all" ? "Year by year" : "Month by month"}</h2></div></header><div class="trend-bars">${periods.map((item) => `<article><i style="--height:${Math.max(3,Math.round(Number(item.attendance || 0)/maxPeriod*100))}%"><span>${Number(item.attendance || 0).toLocaleString()}</span></i><b>${analysisPeriodLabel(item.label)}</b></article>`).join("") || `<p class="empty">No attendance matches these filters.</p>`}</div></section><section class="analytics-locations"><header><span class="kicker">Location comparison</span><h2>Attendance by location</h2></header>${locations.map((item) => `<button type="button" data-analysis-location="${esc(item.label)}"><span><b>${esc(item.label)}</b><small>View this location</small></span><strong>${Number(item.attendance).toLocaleString()}</strong></button>`).join("") || `<p class="empty">No location totals yet.</p>`}</section></div>
+    ${detailed ? `<section class="analytics-ledger"><header><div><span class="kicker">Attendance history</span><h2>${records.length} service record${records.length === 1 ? "" : "s"}</h2></div></header><div class="analytics-row analytics-row-head"><span>Date</span><span>Location</span><span>Service</span><span>Time</span><span>Attendance</span></div>${records.map((item) => `<div class="analytics-row"><span>${new Date(`${item.date}T12:00:00`).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}</span><span>${esc(item.location)}</span><span>${esc(item.service)}</span><span>${esc(item.time || "—")}</span><strong>${Number(item.attendance).toLocaleString()}</strong></div>`).join("")}</section>` : ""}
+  </section>`;
+}
 function render() {
   if (!state.authenticated) return loginView();
   const live = state.date === todayInLondon(),
@@ -231,6 +274,7 @@ function render() {
     ${state.workspaceTab === "history" ? `<section class="recent"><div><span class="kicker">${live ? "Live arrivals" : "Attendance record"}</span><h2>${live ? "Recently checked in" : "Recorded check-ins"}</h2></div>${state.recent.slice(0, 100).map((item) => `<article>${item.photoRecordId ? `<img src="/api/photo?record=${encodeURIComponent(item.photoRecordId)}" alt="">` : `<i>${esc(item.name[0])}</i>`}<div><b>${esc(item.name)}</b><span>${esc(item.service)} · ${new Date(item.checkedInAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</span></div><strong>✓</strong></article>`).join("") || `<p class="empty">No check-ins match this service.</p>`}</section>` : ""}
   </section></main>${confirmationOverlay()}</div>`;
   if (state.workspaceTab === "overview") {
+    document.querySelector(".operations-overview")?.insertAdjacentHTML("beforeend", analyticsMarkup(false));
     document.querySelector("[data-open-counts]")?.addEventListener("click", () => {
       state.workspaceTab = "counts";
       localStorage.setItem("tlc_attendance_workspace_v2", "counts");
@@ -243,6 +287,10 @@ function render() {
     const locationCard = document.querySelector(".location-card");
     if (locationCard) locationCard.innerHTML = `<header><div><span class="kicker">Service footprint</span><h2>Location split</h2></div></header><div class="location-chart"><div class="location-donut" style="--segments:conic-gradient(${locationGradient || "#dfe6ec 0 100%"})"><span><b>${locationTotal}</b>Total</span></div><div class="location-legend">${locationRows.map((item,index) => { const value=Number(item.official || item.identified || 0), percentage=locationTotal ? Math.round(value/locationTotal*100) : 0; return `<article><i style="background:${locationColors[index % locationColors.length]}"></i><b>${esc(item.location)}</b><span>${value}</span><small>${percentage}%</small></article>`; }).join("")}</div></div>`;
   }
+  if (state.workspaceTab === "history") {
+    const history = document.querySelector(".recent");
+    if (history) history.outerHTML = analyticsMarkup(true);
+  }
   bind();
 }
 function bind() {
@@ -251,10 +299,36 @@ function bind() {
       await stopCamera();
       state.workspaceTab = button.dataset.workspaceTab;
       localStorage.setItem("tlc_attendance_workspace_v2", state.workspaceTab);
+      if (["overview","history"].includes(state.workspaceTab)) await loadAnalytics();
       render();
       if (state.workspaceTab === "checkin" && state.date === todayInLondon()) await startCamera();
     };
   });
+  if (document.querySelector("#analyticsFilters")) {
+    document.querySelector("#analyticsFilters").onsubmit = async (event) => {
+      event.preventDefault();
+      const values = new FormData(event.currentTarget);
+      state.analyticsDate = String(values.get("date") || "");
+      state.analyticsPeriod = String(values.get("period") || "monthly");
+      state.analyticsLocation = String(values.get("location") || "");
+      state.analyticsService = String(values.get("service") || "");
+      localStorage.setItem("tlc_attendance_analysis_period",state.analyticsPeriod);
+      await loadAnalytics();
+      render();
+    };
+    document.querySelector(".clear-analysis-date")?.addEventListener("click",async () => {
+      state.analyticsDate = "";
+      await loadAnalytics();
+      render();
+    });
+    document.querySelectorAll("[data-analysis-location]").forEach((button) => {
+      button.onclick = async () => {
+        state.analyticsLocation = button.dataset.analysisLocation || "";
+        await loadAnalytics();
+        render();
+      };
+    });
+  }
   document.querySelectorAll("[data-overview-reading]").forEach((button) => {
     button.onclick = async () => {
       state.selectedReading = Number(button.dataset.overviewReading);
@@ -521,6 +595,7 @@ async function scan(code) {
 
 try {
   await loadOverview();
+  await loadAnalytics();
   state.authenticated = true;
   render();
   await startCamera();

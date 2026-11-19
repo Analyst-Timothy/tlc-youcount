@@ -46,6 +46,9 @@ test("TED records unlimited spreadsheet headcounts and gets a group average", as
       if (Number(body.eventId)) selectedEventId = Number(body.eventId);
       return route.fulfill({ json: response() });
     }
+    if (body.action === "analytics") {
+      return route.fulfill({ json: { ok:true, analytics:{ total:1024,serviceCount:6,average:171,peak:{date:today,location:"North London",service:"First Sunday Service",attendance:220},periods:[{label:"2026-10-01",attendance:480},{label:"2026-11-01",attendance:544}],locations:[{label:"North London",attendance:600},{label:"Canary Wharf",attendance:424}],services:[],records:[{date:today,location:"North London",service:"First Sunday Service",time:"09:00",attendance:220}] } } });
+    }
     if (body.action === "headcount") {
       selectedEventId = Number(body.eventId);
       const total = Number(body.male || 0) + Number(body.female || 0),
@@ -82,6 +85,8 @@ test("TED records unlimited spreadsheet headcounts and gets a group average", as
   await expect(page.getByLabel("Service or event")).toContainText("First Sunday Service");
   await expect(page.getByLabel("Service or event")).toContainText("Second Sunday Service");
   await expect(page.getByLabel("Service type")).toContainText("Sunday service");
+  await expect(page.getByText("Month by month")).toBeVisible();
+  await expect(page.locator('#analyticsFilters select[name="location"]')).toContainText("All locations");
   await page.getByRole("button", { name: /Headcounts/ }).click();
 
   for (const [index, values] of [[100, 120], [105, 125], [98, 122], [101, 121], [102, 123], [99, 119]].entries()) {
@@ -106,4 +111,14 @@ test("TED records unlimited spreadsheet headcounts and gets a group average", as
   await page.getByRole("button", { name: "Import Planning Center" }).click();
   await expect(page.getByText("1 Planning Center event added.")).toBeVisible();
   await expect(page.getByLabel("Service or event")).toContainText("Planning Center Conference");
+
+  await page.getByRole("button", { name: /^Attendance History/ }).click();
+  await expect(page.getByText("1 service record")).toBeVisible();
+  await page.locator('#analyticsFilters input[name="date"]').fill(today);
+  await page.getByRole("button", { name:"Apply", exact:true }).click();
+  await expect(page.getByRole("button", { name:"Clear date" })).toBeEnabled();
+  await page.getByRole("button", { name:"Clear date" }).click();
+  await page.locator('#analyticsFilters select[name="period"]').selectOption("quarterly");
+  await page.getByRole("button", { name:"Apply", exact:true }).click();
+  await expect(page.getByText("Quarter by quarter")).toBeVisible();
 });

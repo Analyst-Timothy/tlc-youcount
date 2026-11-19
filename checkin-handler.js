@@ -405,6 +405,60 @@ async function overview(db, body = {}) {
   };
 }
 
+async function attendanceAnalytics(db, body = {}) {
+  const period = ["weekly", "monthly", "quarterly", "yearly", "all"].includes(String(body.period || ""))
+      ? String(body.period) : "monthly",
+    location = canonicalLocation(body.location),
+    service = clean(body.service),
+    exactDate = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date || "")) ? String(body.date) : "",
+    cutoff = period === "weekly" ? "12 weeks" : period === "monthly" ? "12 months" : period === "quarterly" ? "24 months" : "100 years",
+    bucket = period === "weekly" ? "week" : period === "quarterly" ? "quarter" : period === "yearly" || period === "all" ? "year" : "month";
+  const rows = await db.query(`
+    WITH active_readings AS (
+      SELECT r.* FROM attendance_headcount_readings r
+      WHERE r.group_name IS NOT NULL OR NOT EXISTS (
+        SELECT 1 FROM attendance_headcount_readings newer
+        WHERE newer.attendance_event_id=r.attendance_event_id AND newer.group_name IS NOT NULL
+      )
+    ), group_averages AS (
+      SELECT attendance_event_id,coalesce(group_name,'Legacy') AS group_name,
+             round(avg(main_church_count+teenager_count+children_count))::int AS group_average
+      FROM active_readings GROUP BY attendance_event_id,coalesce(group_name,'Legacy')
+    ), event_totals AS (
+      SELECT e.id,e.event_date,e.location,e.name,e.starts_at,e.event_type,
+             sum(g.group_average)::int AS attendance
+      FROM attendance_events e JOIN group_averages g ON g.attendance_event_id=e.id
+      WHERE ($1='' OR e.location=$1) AND ($2='' OR e.name=$2)
+        AND ($3='' OR e.event_date=nullif($3,'')::date)
+        AND ($3<>'' OR e.event_date >= current_date-$4::interval)
+      GROUP BY e.id,e.event_date,e.location,e.name,e.starts_at,e.event_type
+    )
+    SELECT event_date::text AS date,location,name,starts_at,event_type,attendance,
+           date_trunc($5,event_date)::date::text AS bucket
+    FROM event_totals ORDER BY event_date,starts_at NULLS LAST,name,location
+  `,[location,service,exactDate,cutoff,bucket]);
+  const periods = new Map(), locations = new Map(), services = new Map();
+  for (const row of rows) {
+    const attendance = Number(row.attendance || 0);
+    periods.set(row.bucket,(periods.get(row.bucket)||0)+attendance);
+    locations.set(row.location,(locations.get(row.location)||0)+attendance);
+    services.set(row.name,(services.get(row.name)||0)+attendance);
+  }
+  const values = rows.map((row) => Number(row.attendance || 0)),
+    total = values.reduce((sum,value) => sum+value,0),
+    peak = rows.reduce((best,row) => !best || Number(row.attendance)>Number(best.attendance) ? row : best,null);
+  return {
+    period, exactDate, selectedLocation: location, selectedService: service,
+    total, serviceCount: rows.length,
+    average: rows.length ? Math.round(total/rows.length) : 0,
+    peak: peak ? { date:peak.date,location:peak.location,service:peak.name,attendance:Number(peak.attendance) } : null,
+    periods:[...periods].map(([label,attendance]) => ({label,attendance})),
+    locations:[...locations].map(([label,attendance]) => ({label,attendance})).sort((a,b)=>b.attendance-a.attendance),
+    services:[...services].map(([label,attendance]) => ({label,attendance})).sort((a,b)=>b.attendance-a.attendance),
+    records:rows.slice().reverse().map((row) => ({date:row.date,location:row.location,service:row.name,time:row.starts_at ? String(row.starts_at).slice(0,5) : "",attendance:Number(row.attendance)})),
+  };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") return L.json(res, 405, { ok: false });
   try {
@@ -442,11 +496,13 @@ module.exports = async function handler(req, res) {
       return L.json(res, 200, { ok: true });
     }
     if (!authorised(req)) return L.json(res, 401, { ok: false });
-    const db = ["overview", "headcount", "createEvent", "importPlanningCenter", "importHistory"].includes(action)
+    const db = ["overview", "analytics", "headcount", "createEvent", "importPlanningCenter", "importHistory"].includes(action)
       ? await L.migrateDb()
       : await L.initDb();
     if (action === "overview")
       return L.json(res, 200, { ok: true, ...(await overview(db, req.body || {})) });
+    if (action === "analytics")
+      return L.json(res, 200, { ok: true, analytics: await attendanceAnalytics(db, req.body || {}) });
     if (action === "createEvent") {
       const event = await ensureEvent(db, {
         date: req.body?.date,
@@ -686,3 +742,4 @@ module.exports = async function handler(req, res) {
 module.exports._readingSummary = readingSummary;
 module.exports._canonicalLocation = canonicalLocation;
 module.exports._defaultServices = DEFAULT_SERVICES;
+module.exports._attendanceAnalytics = attendanceAnalytics;
