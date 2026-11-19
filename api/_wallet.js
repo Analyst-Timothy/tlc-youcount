@@ -4,11 +4,35 @@ const L = require("./_lib");
 
 const b64 = (value) => Buffer.from(value).toString("base64url");
 
+function applePushCredentials(encoded, passphrase, teamId) {
+  const forge = require("node-forge"),
+    p12 = forge.pkcs12.pkcs12FromAsn1(
+      forge.asn1.fromDer(forge.util.decode64(String(encoded || "").replace(/\s/g, ""))),
+      false,
+      String(passphrase || ""),
+    ),
+    certBags = p12.getBags({ bagType: forge.pki.oids.certBag })[forge.pki.oids.certBag] || [],
+    keyBags = [
+      ...(p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag] || []),
+      ...(p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag] || []),
+    ],
+    signerBag = certBags.find((bag) => bag.cert?.subject?.getField("OU")?.value === teamId) || certBags[0],
+    signer = signerBag?.cert,
+    key = keyBags[0]?.key;
+  if (!signer || !key) throw new Error("apple_push_private_key_missing");
+  const chain = [signerBag, ...certBags.filter((bag) => bag !== signerBag)]
+    .map((bag) => forge.pki.certificateToPem(bag.cert))
+    .join("\n");
+  return { cert: chain, key: forge.pki.privateKeyToPem(key) };
+}
+
 async function applePushToken(pushToken) {
   const encoded = String(process.env.APPLE_PASS_P12_BASE64 || "").replace(/\s/g, ""),
     passphrase = String(process.env.APPLE_PASS_P12_PASSWORD || ""),
-    topic = String(process.env.APPLE_PASS_TYPE_ID || "");
+    topic = String(process.env.APPLE_PASS_TYPE_ID || ""),
+    teamId = String(process.env.APPLE_TEAM_ID || "");
   if (!encoded || !topic || !pushToken) return false;
+  const credentials = applePushCredentials(encoded, passphrase, teamId);
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -18,8 +42,8 @@ async function applePushToken(pushToken) {
       resolve(value);
     };
     const client = http2.connect("https://api.push.apple.com", {
-      pfx: Buffer.from(encoded, "base64"),
-      passphrase,
+      cert: credentials.cert,
+      key: credentials.key,
     });
     client.once("error", () => finish(false));
     const request = client.request({
@@ -203,4 +227,4 @@ async function notifyWalletUpdate(db, identityId) {
   return { apple: appleResults.filter(Boolean).length, google };
 }
 
-module.exports = { notifyWalletUpdate, upsertGooglePassObject };
+module.exports = { notifyWalletUpdate, upsertGooglePassObject, applePushCredentials };
