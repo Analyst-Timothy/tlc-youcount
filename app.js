@@ -1691,8 +1691,21 @@ async function api(action, body = {}) {
     ok: false,
     message: "The service is temporarily unavailable.",
   }));
-  if (!response.ok) throw new Error(data.message || "Service unavailable");
+  if (!response.ok) {
+    const error = new Error(data.message || "Service unavailable");
+    error.status = response.status;
+    throw error;
+  }
   return data;
+}
+async function retryTransientApi(action, body = {}) {
+  try {
+    return await api(action, body);
+  } catch (error) {
+    if (error.status && error.status < 500) throw error;
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    return api(action, body);
+  }
 }
 async function ensureVisitorSession(force = false) {
   if (!force && state.sessionToken) return state.sessionToken;
@@ -3093,7 +3106,7 @@ async function search() {
   if (state.sessionToken) clearDraft();
   $("#searchBtn").disabled = true;
   try {
-    const result = await api("start", {
+    const result = await retryTransientApi("start", {
       name: state.search,
       browserId: BROWSER_SESSION_ID,
     });
@@ -5057,11 +5070,11 @@ function bindProfileWizard() {
   ].forEach((name) => moveField(name, 3));
   const groups = form.querySelector(".group-picker-section");
   if (groups) panel(3).appendChild(groups);
+  const giftAid = $("#giftAidSection");
+  if (giftAid) panel(3).appendChild(giftAid);
   const serving = form.querySelector(".serving-section");
   serving?.remove();
   ["workStatus", "industry", "jobRole", "skills", "volunteeringInterests"].forEach((name) => moveField(name, 3));
-  const giftAid = $("#giftAidSection");
-  if (giftAid) panel(3).appendChild(giftAid);
   grid.remove();
   form
     .querySelectorAll(

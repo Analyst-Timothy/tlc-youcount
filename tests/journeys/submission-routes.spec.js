@@ -169,4 +169,11 @@ test("Gift Aid appears for a UK attendee", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#giftAidSection")).not.toHaveAttribute("hidden", "");
   await expect(page.locator('select[name="giftAidChoice"]')).toContainText("Yes, I’m a UK taxpayer");
+  const sectionOrder = await page.locator('[data-profile-panel="3"] .wizard-fields').evaluate((panel) =>
+    [...panel.children].map((child) => child.id || child.className),
+  );
+  const teamsIndex = sectionOrder.indexOf("group-picker-section");
+  const giftAidIndex = sectionOrder.indexOf("giftAidSection");
+  expect(teamsIndex).toBeGreaterThanOrEqual(0);
+  expect(giftAidIndex).toBe(teamsIndex + 1);
 });
