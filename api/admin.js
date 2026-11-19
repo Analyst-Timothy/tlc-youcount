@@ -781,6 +781,7 @@ module.exports = async function handler(req, res) {
           `SELECT r.id,r.kind,r.planning_center_ids,r.submitted_payload,r.status,r.created_at,r.updated_at,r.identity_id,
                   i.public_id,i.role_code,i.status AS identity_status,i.connect_completed,i.connect_source,i.connect_exception
            FROM review_records r LEFT JOIN tlc_identities i ON i.id=r.identity_id
+           WHERE r.kind<>'finance_gift_aid'
            ORDER BY r.updated_at DESC,r.created_at DESC,r.id DESC LIMIT 150`,
         ),
         countRows = await db.query(

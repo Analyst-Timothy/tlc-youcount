@@ -1136,12 +1136,14 @@ function memberCareBody() {
       ],
       ["Visitors", counts.visitor || 0, "Visitors", "+"],
       ["Escalations", counts.manual_review || 0, "Escalated Cases", "!"],
+      ["Gift Aid", counts.finance_gift_aid || 0, "Gift Aid Review", "£"],
     ];
   const typeLabel = {
     profile_update: "Profile update",
     possible_duplicate: "Possible duplicate",
     visitor: "Visitor",
     manual_review: "Verification support",
+    finance_gift_aid: "Gift Aid",
   };
   const statusLabel = {
     pending: "Needs review",
@@ -1351,6 +1353,7 @@ function displayAdminValue(value) {
   return esc(value);
 }
 function reviewRecordCard(record) {
+  if (record.kind === "finance_gift_aid") return giftAidReviewCard(record);
   const changes = record.submission?.changes || {},
     choices = record.submission?.choices || {},
     ids = record.planningCenterIds || [],
@@ -1380,6 +1383,16 @@ function reviewRecordCard(record) {
           .join("")}</div>`
       : ""
   }<footer class="record-workflow"><label>Review outcome<select data-record-status data-record-id="${record.id}"><option value="pending" ${record.status === "pending" ? "selected" : ""}>Pending review</option><option value="follow_up" ${record.status === "follow_up" ? "selected" : ""}>Needs follow-up</option><option value="updated_pc" ${record.status === "updated_pc" ? "selected" : ""}>Updated in Planning Center</option><option value="rejected" ${record.status === "rejected" ? "selected" : ""}>Rejected / no action</option><option value="completed" ${record.status === "completed" ? "selected" : ""}>Completed</option></select></label></footer></article>`;
+}
+function giftAidReviewCard(record) {
+  const gift = record.submission?.changes?.giftAid || {},
+    choiceLabels = {
+      yes: "Yes, I’m a UK taxpayer",
+      already: "I’ve already made a Gift Aid declaration",
+      no: "No, thank you",
+    },
+    declarations = gift.wording || {};
+  return `<article class="review-record gift-aid-review"><header><div><span class="eyebrow">Finance review #${esc(record.id)}</span><h3>${esc(gift.fullName || "Gift Aid response")}</h3><p>${new Date(record.createdAt).toLocaleString("en-GB")}</p></div>${badge(record.status)}</header><div class="notice"><b>Finance-only Gift Aid record</b><br>This declaration is separate from the person’s general profile review and is not written to Planning Center.</div><div class="admin-member-identity"><div><span>YouCount Number</span><strong>${esc(record.identity?.publicId || "Pending identity match")}</strong></div><div><span>Gift Aid response</span><strong>${esc(choiceLabels[gift.choice] || "Not provided")}</strong></div></div><div class="change-grid"><div class="change-item"><span>Full name</span><div>${displayAdminValue(gift.fullName)}</div></div><div class="change-item"><span>Phone</span><div>${displayAdminValue(gift.phone)}</div></div><div class="change-item"><span>Home address</span><div>${displayAdminValue(gift.homeAddress)}</div></div><div class="change-item"><span>Declaration date</span><div>${displayAdminValue(gift.declarationDate)}</div></div><div class="change-item"><span>Signed name</span><div>${displayAdminValue(gift.signedName)}</div></div><div class="change-item"><span>Donor declaration</span><div>${gift.donorDeclarationAccepted ? "Accepted" : "Not applicable"}</div></div><div class="change-item"><span>Privacy consent</span><div>${gift.privacyConsentAccepted ? "Accepted" : "Not applicable"}</div></div></div>${Object.keys(declarations).length ? `<details class="submitted-details"><summary>Declaration wording retained with this record <span>Open wording</span></summary><div class="change-grid"><div class="change-item"><span>Gift Aid scope</span><div>${displayAdminValue(declarations.summary)}</div></div><div class="change-item"><span>Donor declaration</span><div>${displayAdminValue(declarations.donorDeclaration)}</div></div><div class="change-item"><span>Privacy consent</span><div>${displayAdminValue(declarations.privacyConsent)}</div></div></div></details>` : ""}<footer class="record-workflow"><label>Finance review outcome<select data-record-status data-record-id="${record.id}"><option value="pending" ${record.status === "pending" ? "selected" : ""}>Pending review</option><option value="follow_up" ${record.status === "follow_up" ? "selected" : ""}>Needs follow-up</option><option value="completed" ${record.status === "completed" ? "selected" : ""}>Completed</option><option value="rejected" ${record.status === "rejected" ? "selected" : ""}>Rejected / no action</option></select></label></footer></article>`;
 }
 function adminPagination() {
   const pagination = state.adminData.pagination || {},
