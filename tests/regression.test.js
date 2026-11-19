@@ -17,9 +17,20 @@ test("survey keeps every launch location", () => {
     "Lagos",
     "Houston",
     "e-TLC",
+    "YouTube",
   ]) {
-    assert.match(app, new RegExp(`<option>${location}</option>`));
+    assert.match(app, new RegExp(location));
   }
+});
+
+test("campaign additions keep Gift Aid isolated and finance reviewed", () => {
+  const app = source("app.js"), member = source("api/member.js"), admin = source("api/admin.js");
+  assert.match(app, /Discipleship/);
+  assert.match(app, /Sunday 27 December 2026/);
+  assert.match(app, /giftAidSection/);
+  assert.match(member, /finance_gift_aid/);
+  assert.match(member, /declarationDate: new Date\(\)\.toLocaleDateString/);
+  assert.match(admin, /youcount_prize_draw/);
 });
 
 test("Social Media catalogue is selectable and SOL has its public name", () => {

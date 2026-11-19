@@ -82,6 +82,16 @@ async function migrateDb() {
   await db.query(
     `ALTER TABLE review_records ADD COLUMN IF NOT EXISTS identity_id bigint`,
   );
+  await db.query(`CREATE TABLE IF NOT EXISTS youcount_prize_draws (
+    id bigserial PRIMARY KEY,
+    service_date date NOT NULL,
+    location text NOT NULL,
+    service text NOT NULL,
+    winner_identity_id bigint NOT NULL,
+    candidate_count integer NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(service_date,location,service)
+  )`);
   await db.query(`CREATE TABLE IF NOT EXISTS tlc_identities (
     id bigserial PRIMARY KEY, public_id text UNIQUE, status text NOT NULL DEFAULT 'provisional',
     connect_completed boolean NOT NULL DEFAULT false, connect_source text NOT NULL DEFAULT 'unconfirmed',

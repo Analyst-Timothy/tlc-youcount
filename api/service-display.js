@@ -40,6 +40,7 @@ const DISPLAY_LOCATIONS = [
   "Lagos",
   "Houston",
   "e-TLC",
+  "YouTube",
 ];
 const londonDate = () =>
   new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" });

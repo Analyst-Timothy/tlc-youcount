@@ -1,6 +1,7 @@
 const L = require("./_lib");
 const Wallet = require("./_wallet");
 const Member = require("./member");
+const crypto = require("node:crypto");
 const COOKIE = "tlc_admin";
 const SURVEY_COOKIE = "tlc_survey_admin";
 const PASTORAL_COOKIE = "tlc_pastoral_staff";
@@ -15,6 +16,7 @@ const CHECKIN_LOCATIONS = [
   "Lagos",
   "Houston",
   "e-TLC",
+  "YouTube",
 ];
 const cleanCheckinText = (value, max = 80) =>
   String(value || "")
@@ -265,6 +267,47 @@ module.exports = async function handler(req, res) {
       return L.json(res, 200, { ok: true });
     }
     if (!authorised(req)) return L.json(res, 401, { ok: false });
+    if (action === "prizeDraw") {
+      const db = await L.migrateDb(),
+        date = /^\d{4}-\d{2}-\d{2}$/.test(String(req.body?.date || "")) ? String(req.body.date) : "",
+        location = CHECKIN_LOCATIONS.includes(String(req.body?.location || "")) ? String(req.body.location) : "",
+        service = ["First Sunday Service", "Second Sunday Service"].includes(String(req.body?.service || "")) ? String(req.body.service) : "";
+      if (!date || !location || !service)
+        return L.json(res, 400, { ok: false, message: "Choose a date, location and service." });
+      const previous = await db.query(
+        `SELECT d.id,d.candidate_count,d.created_at,i.public_id
+         FROM youcount_prize_draws d JOIN tlc_identities i ON i.id=d.winner_identity_id
+         WHERE d.service_date=$1 AND d.location=$2 AND d.service=$3`,
+        [date, location, service],
+      );
+      if (previous.length)
+        return L.json(res, 200, { ok: true, existing: true, draw: { publicId: previous[0].public_id, candidateCount: Number(previous[0].candidate_count), drawnAt: previous[0].created_at } });
+      const rows = await db.query(
+        `SELECT DISTINCT ON (r.identity_id) r.identity_id,r.submitted_payload,r.created_at,i.public_id
+         FROM review_records r JOIN tlc_identities i ON i.id=r.identity_id
+         WHERE r.identity_id IS NOT NULL AND i.public_id IS NOT NULL AND i.is_test=false
+           AND (r.created_at AT TIME ZONE 'Europe/London')::date=$1::date
+         ORDER BY r.identity_id,r.created_at DESC`,
+        [date],
+      );
+      const candidates = rows.filter((row) => {
+        const payload = L.decrypt(row.submitted_payload) || {},
+          changes = payload.changes || payload,
+          localHour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", hourCycle: "h23" }).format(new Date(row.created_at)));
+        if (String(changes.tlcLocation || "") !== location) return false;
+        return service === "First Sunday Service" ? localHour < 11 : localHour >= 11;
+      });
+      if (!candidates.length)
+        return L.json(res, 404, { ok: false, message: "No completed forms match this service window." });
+      const winner = candidates[crypto.randomInt(0, candidates.length)];
+      await db.query(
+        `INSERT INTO youcount_prize_draws(service_date,location,service,winner_identity_id,candidate_count)
+         VALUES($1,$2,$3,$4,$5)`,
+        [date, location, service, winner.identity_id, candidates.length],
+      );
+      await L.audit(db, null, L.hash(L.clientIp(req)), "youcount_prize_draw", { date, location, service, candidateCount: candidates.length }, "approved");
+      return L.json(res, 200, { ok: true, existing: false, draw: { publicId: winner.public_id, candidateCount: candidates.length, drawnAt: new Date().toISOString() } });
+    }
     if (action === "maintenance_setup") {
       const db = await L.migrateDb(),
         { syncCatalogues } = require("./_catalog");
@@ -776,6 +819,7 @@ module.exports = async function handler(req, res) {
           "possible_duplicate",
           "manual_review",
           "visitor",
+          "finance_gift_aid",
         ]),
         kind = allowedKinds.has(String(req.body?.kind))
           ? String(req.body.kind)

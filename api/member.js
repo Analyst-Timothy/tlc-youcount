@@ -27,6 +27,7 @@ const TLC_ANALYTICS_LOCATIONS = new Set([
   "Lagos",
   "Houston",
   "e-TLC",
+  "YouTube",
 ]);
 const canonicalTlcLocation = (value) => {
   const location = String(value || "").trim();
@@ -35,6 +36,9 @@ const canonicalTlcLocation = (value) => {
   return TLC_ANALYTICS_LOCATIONS.has(location) ? location : "";
 };
 const UK_POSTCODE = /^(GIR\s?0AA|[A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})$/i;
+const GIFT_AID_DONOR_WORDING = "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference. I understand The Liberty Church will reclaim 25p of tax on every £1 that I give on or after 1st January 2015.";
+const GIFT_AID_PRIVACY_WORDING = "I consent to my personal information being used solely for Gift Aid related internal church management purposes, all in accordance with our Privacy Policy which can be viewed at www.thelibertychurchlondon.com/privacy-policy/";
+const GIFT_AID_SUMMARY_WORDING = "Please treat as Gift Aid donations all qualifying gifts of money I make today, in the past 4 years and in the future to The Liberty Church.";
 const cleanAddressPostcode = (value) => {
   const compact = String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
   return compact.length > 3
@@ -2645,6 +2649,10 @@ module.exports = async function handler(req, res) {
         "smallGroup",
         "otherGroups",
         "photo",
+        "giftAidChoice",
+        "giftAidDonorDeclaration",
+        "giftAidPrivacyConsent",
+        "giftAidSignature",
       ];
       const rawChanges =
         req.body?.changes && typeof req.body.changes === "object"
@@ -2727,6 +2735,40 @@ module.exports = async function handler(req, res) {
       const establishedJourney = ["member", "attendee"].includes(
         String(changes.membershipStatus || ""),
       );
+      let giftAidRecord = null;
+      const giftChoice = String(changes.giftAidChoice || ""),
+        giftEligible = establishedJourney && String(changes.countryOfResidence || "") === "United Kingdom";
+      if (giftChoice && (!giftEligible || !new Set(["yes", "already", "no"]).has(giftChoice)))
+        return L.json(res, 400, { ok: false, message: "Choose a valid Gift Aid option." });
+      if (giftChoice === "yes") {
+        const expectedName = `${changes.firstName || ""} ${changes.lastName || ""}`.trim().toLocaleLowerCase("en-GB").replace(/\s+/g, " "),
+          signature = String(changes.giftAidSignature || "").trim(),
+          signedName = signature.toLocaleLowerCase("en-GB").replace(/\s+/g, " ");
+        if (!UK_POSTCODE.test(String(changes.postcode || "")))
+          return L.json(res, 400, { ok: false, message: "Enter a valid UK postcode for the Gift Aid declaration." });
+        if (changes.giftAidDonorDeclaration !== "yes" || changes.giftAidPrivacyConsent !== "yes")
+          return L.json(res, 400, { ok: false, message: "Confirm both Gift Aid declarations before signing." });
+        if (!signature || signedName !== expectedName)
+          return L.json(res, 400, { ok: false, message: "Type your full name exactly as shown to sign the Gift Aid declaration." });
+      }
+      if (giftChoice) {
+        giftAidRecord = {
+          choice: giftChoice,
+          financeReview: true,
+          declarationDate: new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }),
+          fullName: `${changes.firstName || ""} ${changes.lastName || ""}`.trim(),
+          phone: String(changes.phone || ""),
+          homeAddress: [changes.addressLine1, changes.postcode].filter(Boolean).join(", "),
+          signedName: giftChoice === "yes" ? String(changes.giftAidSignature || "").trim() : "",
+          donorDeclarationAccepted: giftChoice === "yes",
+          privacyConsentAccepted: giftChoice === "yes",
+          wording: giftChoice === "yes" ? { summary: GIFT_AID_SUMMARY_WORDING, donorDeclaration: GIFT_AID_DONOR_WORDING, privacyConsent: GIFT_AID_PRIVACY_WORDING } : null,
+        };
+      }
+      delete changes.giftAidChoice;
+      delete changes.giftAidDonorDeclaration;
+      delete changes.giftAidPrivacyConsent;
+      delete changes.giftAidSignature;
       if (establishedJourney && !changes.yearStartedAttending)
         return L.json(res, 400, {
           ok: false,
@@ -2907,6 +2949,16 @@ module.exports = async function handler(req, res) {
         } catch (error) {
           console.error("Wallet OTA notification failed", error.message);
         }
+      }
+      if (identity && giftAidRecord) {
+        await db.query(
+          `INSERT INTO review_records(kind,planning_center_ids,submitted_payload,active_subject_hash,identity_id,updated_at)
+           VALUES('finance_gift_aid',$1,$2,$3,$4,now())
+           ON CONFLICT(active_subject_hash) WHERE active_subject_hash IS NOT NULL DO UPDATE SET
+             submitted_payload=excluded.submitted_payload,identity_id=excluded.identity_id,status='pending',updated_at=now()`,
+          [L.encrypt([]), L.encrypt({ changes: { giftAid: giftAidRecord }, financeOnly: true }), L.hash(`gift-aid:${identity.id}`), identity.id],
+        );
+        await L.audit(db, s.id, ipHash, "gift_aid_finance_review_created", null, giftAidRecord.choice);
       }
       // The profile submission and TLC identity are already safely stored at
       // this point. Receipt delivery must never turn that successful write

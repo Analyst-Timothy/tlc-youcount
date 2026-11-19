@@ -95,6 +95,7 @@ const OPERATIONS_LOCATIONS = [
   "Lagos",
   "Houston",
   "e-TLC",
+  "YouTube",
 ];
 const groups = [
   "Northside Connect",
@@ -361,6 +362,7 @@ const state = {
   checkinHistoryService: "",
   checkinHistorySearch: "",
   pastoralStatus: "active",
+  prizeDraw: null,
   updates: [
     {
       name: "Grace Osei",
@@ -631,7 +633,7 @@ function campaignWordmark() {
   return `<div class="campaign-wordmark"><img src="/assets/youcount-card/logo-white.png" alt="The Liberty Church"></div>`;
 }
 function privacyNotice(compact = false) {
-  return `<details class="data-privacy ${compact ? "compact" : ""}"><summary>How we use and protect your information</summary><div><p><b>What we collect:</b> Your contact, identity, residence, background, family connections at TLC, date of birth, skills, baptism, church involvement, profile photo and the updates you submit.</p><p><b>Why:</b> To keep church records accurate, support member care and communication, maintain your YouCount identity and develop relevant opportunities.</p><p><b>Who can access it:</b> Authorised Data Team members of The Liberty Church Global only.</p><p><b>How it is protected:</b> Your information is securely stored, encrypted where appropriate, and accessible only to authorised church staff. If you use the postcode finder, the postcode is securely checked by a trusted address-lookup supplier to return address choices. We use appropriate technical and organisational safeguards to protect your information from unauthorised access, loss or misuse.</p><p><b>How long:</b> Profile submissions and photos are retained securely while needed for member identity and data care. Security audit events are retained for 90 days. Anonymous church-health survey answers are stored separately and removed after 90 days.</p><p>Questions? <a href="mailto:${DATA_TEAM_EMAIL}">${DATA_TEAM_EMAIL}</a></p></div></details>`;
+  return `<details class="data-privacy ${compact ? "compact" : ""}"><summary>How we use and protect your information</summary><div><p><b>What we collect:</b> Your contact, identity, residence, background, family connections at TLC, date of birth, skills, baptism, church involvement, profile photo and the updates you submit. If you choose Gift Aid, we also collect and retain your declaration and consent.</p><p><b>Why:</b> To keep church records accurate, support member care and communication, maintain your YouCount identity, develop relevant opportunities and administer Gift Aid where you choose to participate.</p><p><b>Who can access it:</b> Authorised Data Team members of The Liberty Church Global only. Gift Aid declarations are also available to authorised Finance reviewers.</p><p><b>How it is protected:</b> Your information is securely stored, encrypted where appropriate, and accessible only to authorised church staff. If you use the postcode finder, the postcode is securely checked by a trusted address-lookup supplier to return address choices. We use appropriate technical and organisational safeguards to protect your information from unauthorised access, loss or misuse.</p><p><b>How long:</b> Profile submissions and photos are retained securely while needed for member identity and data care. Gift Aid declarations are retained for the period required to administer them and meet applicable legal and tax obligations. Security audit events are retained for 90 days. Anonymous church-health survey answers are stored separately and removed after 90 days.</p><p>The YouCount profile campaign closes on Sunday 27 December 2026.</p><p>Questions? <a href="mailto:${DATA_TEAM_EMAIL}">${DATA_TEAM_EMAIL}</a></p></div></details>`;
 }
 function communicationMethodField() {
   const selected = Array.isArray(state.formDraft?.communicationPreference)
@@ -653,6 +655,7 @@ const FAQS = [
   ["Who can see my information?", "Only authorised members of the Data Team at The Liberty Church Global. Your information is stored securely and is never shown to other members."],
   ["Is the church health survey anonymous?", "Yes. It does not ask for your name, contact details or YouCount Number, and your answers are kept apart from your profile. Responses are deleted after 90 days."],
   ["I used a shared or church phone. Is my information left on it?", "When you finish, tap “Start again”. This clears your details from the phone, ready for the next person."],
+  ["When does YouCount close?", "The current YouCount profile campaign closes on Sunday 27 December 2026."],
 ];
 function faqList() {
   return `<div class="faq-list">${FAQS.map(([question, answer]) => `<details class="faq-item"><summary>${question}</summary><p>${answer}</p></details>`).join("")}</div><div class="notice faq-contact"><b>Still have a question?</b> Email the Data Team at <a href="mailto:${DATA_TEAM_EMAIL}">${DATA_TEAM_EMAIL}</a>.</div>`;
@@ -883,6 +886,8 @@ function admin() {
     "Escalated Cases",
     "Audit Log",
     "Health Survey",
+    "Prize Draw",
+    "Gift Aid Review",
   ];
   const records = state.adminData.records || [],
     serverCounts = state.adminData.counts || {},
@@ -914,8 +919,10 @@ function admin() {
         records.filter((r) => r.kind === "manual_review").length,
       "Audit Log": serverCounts.audit ?? (state.adminData.audits || []).length,
       "Health Survey": state.surveyUnlocked ? state.surveyData.length : "PIN",
+      "Prize Draw": "",
+      "Gift Aid Review": serverCounts.finance_gift_aid ?? records.filter((r) => r.kind === "finance_gift_aid").length,
     };
-  const icons = ["⌂", "●", "▣", "♥", "↻", "◎", "+", "!", "≡", "◇"];
+  const icons = ["⌂", "●", "▣", "♥", "↻", "◎", "+", "!", "≡", "◇", "☆", "£"];
   const navLabels = {
     "Live Operations": "Live Service",
     "Check-ins": "Check-ins",
@@ -926,9 +933,11 @@ function admin() {
     "Escalated Cases": "Verification Support",
     "Audit Log": "Security Audit",
     "Health Survey": "Health Survey",
+    "Prize Draw": "Prize Draw",
+    "Gift Aid Review": "Gift Aid Review",
   };
-  const primaryNav = ["Profile Reviews", "Live Operations", "Check-ins", "Pastoral Care", "Audit Log", "Health Survey"],
-    queueNav = ["Updated Records", "Confirmed Duplicates", "Visitors", "Escalated Cases"],
+  const primaryNav = ["Profile Reviews", "Live Operations", "Check-ins", "Pastoral Care", "Prize Draw", "Audit Log", "Health Survey"],
+    queueNav = ["Updated Records", "Confirmed Duplicates", "Visitors", "Escalated Cases", "Gift Aid Review"],
     navButton = (page) => {
       const index = nav.indexOf(page);
       return `<button class="nav-btn ${state.adminPage === page ? "active" : ""}" data-page="${page}"><span>${icons[index]}</span><b>${navLabels[page] || page}</b><em>${counts[page]}</em></button>`;
@@ -939,6 +948,7 @@ function admin() {
     "Check-ins",
     "Pastoral Care",
     "Health Survey",
+    "Gift Aid Review",
   ].includes(state.adminPage);
   const header = state.adminPage === "Profile Reviews"
     ? `<div class="admin-compact-head"><label><span>⌕</span><input id="adminGlobalSearch" value="${esc(state.adminSearch)}" placeholder="Search people, YouCount Number or location"></label><div class="avatar"><span>Data Team</span><i>DT</i><button class="switch" id="logoutAdmin">Log out</button></div></div>`
@@ -966,6 +976,10 @@ function adminSubtitle() {
     "Audit Log": `Protected verification events are retained for ${AUDIT_RETENTION_DAYS} days, then deleted.`,
     "Health Survey":
       "Anonymous responses are separated from identity records and restricted by an additional PIN.",
+    "Prize Draw":
+      "Draw one auditable YouCount Number from completed forms for a selected Sunday service.",
+    "Gift Aid Review":
+      "Finance-only declarations and Gift Aid responses. Nothing is written to Planning Center.",
   }[state.adminPage];
 }
 const incomplete = () => members.filter((m) => m.profileCompletenessScore < 80);
@@ -975,12 +989,18 @@ function adminBody() {
   if (state.adminPage === "Check-ins") return checkinBody();
   if (state.adminPage === "Pastoral Care") return pastoralCareBody();
   if (state.adminPage === "Health Survey") return surveyAdminBody();
+  if (state.adminPage === "Prize Draw") return prizeDrawBody();
   if (!IS_LOCAL) return liveAdminBody();
   if (state.adminPage === "Updated Records") return updateTable();
   if (state.adminPage === "Confirmed Duplicates") return confirmedDuplicates();
   if (state.adminPage === "Visitors") return escalatedCases();
   if (state.adminPage === "Escalated Cases") return escalatedCases();
   return logTable();
+}
+function prizeDrawBody() {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/London" }),
+    result = state.prizeDraw;
+  return `<section class="prize-draw-panel"><span class="campaign-kicker">Sunday prize draw</span><h3>Draw one YouCount Number</h3><p>Eligible entries are completed forms from the selected location and service window. Each YouCount Number appears once, and the first result is locked for audit.</p><form id="prizeDrawForm"><div class="form-grid"><div class="field"><label>Service date</label><input name="date" type="date" value="${today}" required></div><div class="field"><label>Location</label><select name="location" required><option value="">Choose one</option>${OPERATIONS_LOCATIONS.map((location) => `<option>${esc(location)}</option>`).join("")}</select></div><div class="field"><label>Service</label><select name="service" required><option value="">Choose one</option><option>First Sunday Service</option><option>Second Sunday Service</option></select></div></div><button class="btn">Draw YouCount Number</button></form>${result ? `<div class="prize-result"><span>${result.existing ? "Recorded winner" : "Selected at random"}</span><strong>${esc(result.draw.publicId)}</strong><p>Drawn from ${Number(result.draw.candidateCount)} eligible completed form${Number(result.draw.candidateCount) === 1 ? "" : "s"}. This service result is now locked.</p></div>` : ""}<div class="notice"><b>Service windows:</b> First Service uses forms completed before 11:00; Second Service uses forms completed from 11:00 onward, in London time.</div></section>`;
 }
 function relativeAdminTime(value) {
   const seconds = Math.max(
@@ -1033,7 +1053,7 @@ function liveOperationsBody() {
 function checkinBody() {
   const data = state.adminData.checkins || {},
     rows = data.checkins || [],
-    locations = data.locations || ["Liberty Point Woodford", "North London", "Canary Wharf", "Croydon", "Birmingham", "Lagos", "Houston", "e-TLC"],
+    locations = data.locations || ["Liberty Point Woodford", "North London", "Canary Wharf", "Croydon", "Birmingham", "Lagos", "Houston", "e-TLC", "YouTube"],
     services = data.services || [],
     serviceOptions = data.serviceOptions?.length
       ? data.serviceOptions
@@ -1428,6 +1448,8 @@ function liveAdminBody() {
         ? "possible_duplicate"
         : state.adminPage === "Visitors"
           ? "visitor"
+          : state.adminPage === "Gift Aid Review"
+            ? "finance_gift_aid"
           : "manual_review";
   const query = searchKey(state.adminSearch),
     rows = records
@@ -1874,6 +1896,7 @@ function scheduleAdminRefresh() {
   }, 15000);
 }
 async function loadAdmin() {
+  if (state.adminPage === "Prize Draw") return;
   if (state.adminPage === "Check-ins") {
     const checkins = await adminApi("checkinOverview", {
       date: state.checkinDate,
@@ -1919,6 +1942,8 @@ async function loadAdmin() {
         ? "possible_duplicate"
         : state.adminPage === "Visitors"
           ? "visitor"
+          : state.adminPage === "Gift Aid Review"
+            ? "finance_gift_aid"
           : state.adminPage === "Escalated Cases"
             ? "manual_review"
             : "profile_update",
@@ -2079,6 +2104,8 @@ function bind() {
     surveyOnline.value = "e-TLC";
     surveyOnline.textContent = "e-TLC";
   }
+  if (surveyCampus && ![...surveyCampus.options].some((option) => option.value === "YouTube"))
+    surveyCampus.add(new Option("YouTube", "YouTube"));
   const surveyIntro = document.querySelector(".survey-intro");
   if (surveyIntro)
     surveyIntro.textContent = surveyIntro.textContent.replace(
@@ -2470,6 +2497,23 @@ function bind() {
         render();
       }),
   );
+  if ($("#prizeDrawForm"))
+    $("#prizeDrawForm").onsubmit = async (event) => {
+      event.preventDefault();
+      const button = event.currentTarget.querySelector("button"),
+        values = new FormData(event.currentTarget);
+      button.disabled = true;
+      button.textContent = "Drawing securely…";
+      try {
+        const result = await adminApi("prizeDraw", Object.fromEntries(values));
+        state.prizeDraw = result;
+        render();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = "Draw YouCount Number";
+        alert(error.message || "The draw could not be completed.");
+      }
+    };
   if ($("#adminMenuButton"))
     $("#adminMenuButton").onclick = () => {
       state.adminMenuOpen = !state.adminMenuOpen;
@@ -2721,6 +2765,7 @@ function bind() {
     bindJobFields();
     bindPhotoUpload();
     restoreFormDraft();
+    bindGiftAidFields();
     bindCommunicationOptions();
     applyProfileTerminology();
     bindAgeGroupField();
@@ -3218,6 +3263,7 @@ const TLC_LOCATIONS = [
   "Lagos",
   "Houston",
   "e-TLC",
+  "YouTube",
   "I’m not sure",
 ];
 const AGE_GROUP_OPTIONS = [
@@ -4268,7 +4314,7 @@ function bindTailoredInterestOptions() {
       options.push("Connect");
     if (baptised !== "yes") options.push("Baptism");
     if (teamMember !== "yes") options.push("Serve");
-    options.push("Pastoral care", "None at this time");
+    options.push("Discipleship", "Pastoral care", "None at this time");
     interest.innerHTML = `<option value="">Choose one</option>${options
       .map((value) => `<option>${value}</option>`)
       .join("")}`;
@@ -4279,6 +4325,38 @@ function bindTailoredInterestOptions() {
       update();
   });
   update();
+}
+const GIFT_AID_DONOR_WORDING = "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference. I understand The Liberty Church will reclaim 25p of tax on every £1 that I give on or after 1st January 2015.";
+const GIFT_AID_PRIVACY_WORDING = "I consent to my personal information being used solely for Gift Aid related internal church management purposes, all in accordance with our Privacy Policy which can be viewed at www.thelibertychurchlondon.com/privacy-policy/";
+function bindGiftAidFields() {
+  const form = $("#updateForm"), residence = form?.elements.namedItem("countryOfResidence");
+  if (!form || state.journeyType === "visitor" || $("#giftAidSection")) return;
+  const grid = form.querySelector(".form-grid");
+  if (!grid) return;
+  grid.insertAdjacentHTML("beforeend", `<section class="gift-aid-section" id="giftAidSection" hidden><div class="gift-aid-intro"><b>Gift Aid <em>New</em></b><p>If you pay UK tax, Gift Aid lets the church claim 25p from HMRC for every £1 you give, at no extra cost to you. Optional.</p></div><div class="field"><label>Do you consent to take part in Gift Aid?</label><select name="giftAidChoice"><option value="">Choose one</option><option value="yes">Yes, I’m a UK taxpayer</option><option value="already">I’ve already made a Gift Aid declaration</option><option value="no">No, thank you</option></select></div><div class="gift-aid-declaration" id="giftAidDeclaration" hidden><h4>Your Gift Aid declaration</h4><p>We’ve filled this in from your answers. Check it, tick both boxes and type your name to sign.</p><dl><div><dt>Full name</dt><dd data-gift-name></dd></div><div><dt>Home address</dt><dd data-gift-address></dd></div><div><dt>Phone number</dt><dd data-gift-phone></dd></div><div><dt>Date of declaration</dt><dd>Filled securely when submitted</dd></div></dl><p class="gift-aid-summary">Please treat as Gift Aid donations all qualifying gifts of money I make today, in the past 4 years and in the future to The Liberty Church.</p><label class="gift-aid-check"><input type="checkbox" name="giftAidDonorDeclaration" value="yes"><span><b>Donor’s declaration</b>${GIFT_AID_DONOR_WORDING}</span></label><label class="gift-aid-check"><input type="checkbox" name="giftAidPrivacyConsent" value="yes"><span><b>Privacy consent</b>${GIFT_AID_PRIVACY_WORDING}</span></label><div class="field"><label>Type your full name to sign</label><input name="giftAidSignature" autocomplete="name"><p class="hint">Your typed name is your electronic signature.</p></div><details><summary>Please tell us if you need to</summary><p>Cancel this declaration, change your name or home address, or tell us you no longer pay enough tax on your income and/or capital gains. Email accounts@thelibertychurchlondon.com. If you pay tax at the higher or additional rate, include your Gift Aid donations on your Self Assessment tax return or ask HMRC to adjust your tax code. The Liberty Church, registered charity 1169864.</p></details></div></section>`);
+  const section = $("#giftAidSection"), choice = form.elements.namedItem("giftAidChoice"), declaration = $("#giftAidDeclaration"), postcode = form.elements.namedItem("postcode"), signature = form.elements.namedItem("giftAidSignature"), donor = form.elements.namedItem("giftAidDonorDeclaration"), privacy = form.elements.namedItem("giftAidPrivacyConsent");
+  choice.id = "giftAidChoice";
+  choice.closest(".field")?.querySelector("label")?.setAttribute("for", "giftAidChoice");
+  if (state.formDraft.giftAidChoice) choice.value = state.formDraft.giftAidChoice;
+  if (state.formDraft.giftAidSignature) signature.value = state.formDraft.giftAidSignature;
+  donor.checked = state.formDraft.giftAidDonorDeclaration === "yes";
+  privacy.checked = state.formDraft.giftAidPrivacyConsent === "yes";
+  const refresh = () => {
+    const uk = ["GB", "United Kingdom"].includes(String(residence?.value || ""));
+    section.hidden = !uk;
+    if (!uk) choice.value = "";
+    const yes = uk && choice.value === "yes";
+    declaration.hidden = !yes;
+    [signature, donor, privacy].forEach((field) => { if (field) field.required = yes; });
+    if (postcode) postcode.required = yes;
+    section.querySelector("[data-gift-name]").textContent = `${form.elements.namedItem("firstName")?.value || ""} ${form.elements.namedItem("lastName")?.value || ""}`.trim() || "—";
+    section.querySelector("[data-gift-address]").textContent = [form.elements.namedItem("addressLine1")?.value, postcode?.value].filter(Boolean).join(", ") || "—";
+    section.querySelector("[data-gift-phone]").textContent = form.elements.namedItem("phone")?.value || "—";
+  };
+  residence?.addEventListener("change", refresh);
+  choice?.addEventListener("change", refresh);
+  form.addEventListener("input", (event) => { if (["firstName","lastName","addressLine1","postcode","phone"].includes(event.target.name)) refresh(); });
+  refresh();
 }
 function bindJobFields() {
   const grid = document.querySelector("#updateForm .form-grid");
@@ -4982,6 +5060,8 @@ function bindProfileWizard() {
   const serving = form.querySelector(".serving-section");
   serving?.remove();
   ["workStatus", "industry", "jobRole", "skills", "volunteeringInterests"].forEach((name) => moveField(name, 3));
+  const giftAid = $("#giftAidSection");
+  if (giftAid) panel(3).appendChild(giftAid);
   grid.remove();
   form
     .querySelectorAll(

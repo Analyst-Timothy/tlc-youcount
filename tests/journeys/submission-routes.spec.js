@@ -161,3 +161,12 @@ for (const journeyType of ["visitor", "attendee", "member"]) {
     }
   });
 }
+
+test("Gift Aid appears for a UK attendee", async ({ page }) => {
+  const attendee = { ...profileChanges("attendee"), countryOfResidence: "GB" };
+  await seedJourney(page, "attendee", 5, attendee);
+  await mockMemberServices(page, "attendee", []);
+  await page.goto("/");
+  await expect(page.locator("#giftAidSection")).not.toHaveAttribute("hidden", "");
+  await expect(page.locator('select[name="giftAidChoice"]')).toContainText("Yes, I’m a UK taxpayer");
+});
