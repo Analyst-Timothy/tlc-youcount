@@ -64,13 +64,13 @@ function wordmark() {
   return `<div class="wordmark"><img src="/assets/youcount-card/logo-white.png" alt="The Liberty Church"></div>`;
 }
 function loginView(message = "") {
-  root.innerHTML = `<main class="login-screen"><section class="login-card">${wordmark()}<span class="kicker">Welcoming team</span><h1>Service check-in</h1><p>Use the welcoming-team PIN. This does not provide access to member records or the data-team dashboard.</p><form id="pinForm"><label>Check-in PIN<input id="pin" type="password" inputmode="numeric" autocomplete="one-time-code" required autofocus></label>${message ? `<div class="error">${esc(message)}</div>` : ""}<button>Open scanner</button></form></section></main>`;
-  document.querySelector("#pinForm").onsubmit = async (event) => {
+  root.innerHTML = `<main class="login-screen"><section class="login-card">${wordmark()}<span class="kicker">Welcoming team</span><h1>Service check-in</h1><p>Use the welcoming-team password. This does not provide access to member records or the data-team dashboard.</p><form id="passwordForm"><label>Check-in password<input id="password" name="password" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" required autofocus></label>${message ? `<div class="error">${esc(message)}</div>` : ""}<button>Open attendance</button></form></section></main>`;
+  document.querySelector("#passwordForm").onsubmit = async (event) => {
     event.preventDefault();
     const button = event.currentTarget.querySelector("button");
     button.disabled = true;
     try {
-      await request("login", { pin: document.querySelector("#pin").value });
+      await request("login", { password: document.querySelector("#password").value });
       state.authenticated = true;
       await loadOverview();
       await loadAnalytics();
@@ -577,7 +577,7 @@ async function scan(code) {
     if (error.status === 401) {
       await stopCamera();
       state.authenticated = false;
-      return loginView("Your scanner session expired. Enter the PIN again.");
+      return loginView("Your attendance session expired. Enter the password again.");
     }
     state.result = { error: true, message: error.message };
     playScanSound("error");

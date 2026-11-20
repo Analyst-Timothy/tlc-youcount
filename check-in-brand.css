@@ -38,6 +38,6 @@ h1,h2,h3,.scanner-app>header b { font-family:"Archivo","Arial Black",sans-serif;
   .login-card{width:calc(100vw - 32px) !important;max-width:calc(100vw - 32px) !important;padding:25px 22px !important;border-radius:18px}
   .login-card h1{font-size:clamp(28px,8.6vw,34px);line-height:1.05;overflow-wrap:anywhere}
   .login-card p{font-size:14px}
-  .login-card .wordmark{width:190px;max-width:72%}
+  .login-card .wordmark{width:124px;max-width:48%;margin-bottom:20px;padding:9px}
   .camera-card,.recent,.attendance-panel{border-radius:12px}
 }

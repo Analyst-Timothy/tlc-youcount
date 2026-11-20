@@ -11,7 +11,9 @@ const LOCATIONS = [
   "Houston",
   "Other",
 ];
-const configuredPin = () => String(process.env.CHECKIN_STAFF_PIN || "");
+// Keep the old variable as a compatibility fallback during the password rename.
+const configuredPassword = () =>
+  String(process.env.CHECKIN_STAFF_PASSWORD || process.env.CHECKIN_STAFF_PIN || "");
 const cookieMap = (req) =>
   Object.fromEntries(
     String(req.headers.cookie || "")
@@ -466,19 +468,19 @@ module.exports = async function handler(req, res) {
       ipHash = L.hash(L.clientIp(req));
     if (action === "login") {
       const db = await L.migrateDb(),
-        pin = String(req.body?.pin || "");
+        submittedPassword = String(req.body?.password || req.body?.pin || "");
       if (!(await L.consumeRate(db, "checkin_staff_login", ipHash, 8, 30)))
         return L.json(res, 429, {
           ok: false,
           message: "Too many attempts. Ask the service lead for help.",
         });
-      if (!configuredPin() || !L.safeEqual(pin, configuredPin())) {
+      if (!configuredPassword() || !L.safeEqual(submittedPassword, configuredPassword())) {
         await L.audit(db, null, ipHash, "checkin_staff_login", null, "failed");
         return L.json(res, 401, {
           ok: false,
-          message: configuredPin()
-            ? "That check-in PIN was not recognised."
-            : "The welcoming-team PIN has not been configured yet.",
+          message: configuredPassword()
+            ? "That check-in password was not recognised."
+            : "The welcoming-team password has not been configured yet.",
         });
       }
       res.setHeader(

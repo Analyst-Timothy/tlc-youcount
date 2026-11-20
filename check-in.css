@@ -391,3 +391,39 @@ h1 { font-size:38px; margin:8px 0; color:var(--navy); font-weight:800; letter-sp
 @media(max-width:900px){.scanner-app main.crm-layout{grid-template-columns:1fr}.crm-sidebar{height:auto;padding:8px}.crm-sidebar nav button{min-height:43px}.crm-content{padding:12px}}
 @media(max-width:1100px){.analytics-filters{grid-template-columns:repeat(3,minmax(0,1fr))}.analytics-grid{grid-template-columns:1fr}}
 @media(max-width:560px){.overview-heading h1{font-size:25px}.overview-metrics,.analytics-metrics{grid-template-columns:1fr 1fr}.overview-metrics b{font-size:26px}.live-service-banner{min-height:70px}.live-service-banner b{font-size:15px}.trend-card svg{height:110px}.location-chart{grid-template-columns:1fr}.location-donut{width:130px}.analytics-filters{grid-template-columns:1fr 1fr}.analytics-filters label:nth-of-type(n+2){grid-column:1/-1}.analytics-metrics article:last-child{grid-column:1/-1}.trend-bars{height:190px}}
+
+/* Phone-first TED attendance workspace */
+@media(max-width:560px){
+  .scanner-app > header{height:58px;padding:7px 12px}
+  .scanner-app > header .wordmark{width:96px;padding-right:12px}
+  .scanner-app > header b{font-size:17px}
+  .scanner-app > header button{width:34px;height:34px;font-size:20px}
+  .scanner-app main.crm-layout{min-height:calc(100svh - 58px)}
+  .crm-sidebar{position:sticky;top:58px;z-index:15;margin:0;padding:6px 8px;border-top:1px solid #ffffff1f}
+  .crm-sidebar nav{gap:5px;scroll-snap-type:x proximity}
+  .crm-sidebar nav button{flex:0 0 112px;min-height:40px;padding:7px 9px;scroll-snap-align:start}
+  .crm-sidebar nav button.active{box-shadow:inset 0 -2px var(--amber)}
+  .crm-sidebar nav b{font-size:9px}.crm-sidebar nav small{display:none}
+  .crm-content{gap:10px;padding:10px 10px calc(24px + env(safe-area-inset-bottom))}
+  .service-settings{grid-template-columns:1fr 1fr;gap:7px;padding:8px}
+  .service-settings label{font-size:7px}
+  .service-settings input,.service-settings select{min-height:42px;font-size:9px}
+  .overview-heading{align-items:flex-start}.overview-heading h1{font-size:22px}.five-l-ribbon{width:90px}
+  .live-service-banner{min-height:64px;padding:12px;gap:9px}.live-service-banner>span{padding:5px 7px}.live-service-banner>div{padding-left:9px}.live-service-banner b{font-size:14px}
+  .overview-metrics article{min-width:0;padding:11px}.overview-metrics span{font-size:8px}.overview-metrics b{font-size:23px}.overview-metrics small{font-size:7px}
+  .register-summary{align-items:stretch;flex-direction:column}.register-summary>button{min-height:42px}
+  .workspace-panel,.attendance-panel,.camera-card,.recent{padding:12px}
+  .attendance-heading{align-items:flex-start}.attendance-total{align-items:end;gap:10px}.attendance-total b{font-size:38px}
+  .headcount-sheet{overflow:visible;border:0;background:transparent}
+  #headcountForm.headcount-sheet>.sheet-head{display:none}
+  #headcountForm.headcount-sheet>.sheet-entry{min-width:0;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .sheet-entry label{display:grid;gap:4px}
+  .sheet-entry label>span{position:static;width:auto;height:auto;overflow:visible;clip:auto;color:#617487;font-size:8px;font-weight:600;text-transform:uppercase}
+  #headcountForm.headcount-sheet .sheet-entry input,
+  #headcountForm.headcount-sheet .sheet-entry select{height:46px;border:1px solid #ccd6df;border-radius:8px;padding:10px;font-size:12px}
+  #headcountForm.headcount-sheet .sheet-entry button{grid-column:1/-1;height:48px;border-radius:8px;font-size:11px}
+  .headcount-sheet #headcountStatus{min-width:0;padding:0}
+  .sheet-table{border-radius:8px}
+  .sheet-table-head,.sheet-table-row{min-width:760px;grid-template-columns:36px 52px 52px minmax(145px,1.2fr) 100px 52px 74px minmax(120px,1fr)}
+  .camera-frame{min-height:min(52vh,430px)}
+}

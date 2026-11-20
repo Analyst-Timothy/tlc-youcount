@@ -178,6 +178,9 @@ test("attendance events connect scans, counts, dashboards and imports", () => {
   assert.match(checkinUi, /Month on month · 12 months/);
   assert.match(checkinUi, /All locations/);
   assert.match(checkinUi, /Clear date/);
+  assert.match(checkinUi, /Check-in password/);
+  assert.match(checkinUi, /autocomplete="current-password"/);
+  assert.doesNotMatch(checkinUi, /inputmode="numeric"/);
   assert.match(checkinUi, /Import Planning Center/);
   assert.match(checkinUi, /Import history CSV/);
   assert.match(displayApi, /availableEvents/);
