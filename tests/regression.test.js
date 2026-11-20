@@ -28,7 +28,10 @@ test("campaign additions keep Gift Aid isolated and finance reviewed", () => {
   assert.match(app, /Discipleship/);
   assert.match(app, /Sunday 27 December 2026/);
   assert.match(app, /giftAidSection/);
+  assert.match(app, /giftAidSignatureConsent/);
+  assert.doesNotMatch(app, /name="giftAidSignature"/);
   assert.match(member, /finance_gift_aid/);
+  assert.match(member, /past four years/);
   assert.match(member, /declarationDate: new Date\(\)\.toLocaleDateString/);
   assert.match(admin, /WHERE r\.kind<>'finance_gift_aid'/);
   assert.match(app, /function giftAidReviewCard/);

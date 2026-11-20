@@ -4354,30 +4354,36 @@ function bindTailoredInterestOptions() {
 }
 const GIFT_AID_DONOR_WORDING = "I am a UK taxpayer and understand that if I pay less Income Tax and/or Capital Gains Tax than the amount of Gift Aid claimed on all my donations in that tax year it is my responsibility to pay any difference. I understand The Liberty Church will reclaim 25p of tax on every £1 that I give on or after 1st January 2015.";
 const GIFT_AID_PRIVACY_WORDING = "I consent to my personal information being used solely for Gift Aid related internal church management purposes, all in accordance with our Privacy Policy which can be viewed at www.thelibertychurchlondon.com/privacy-policy/";
+function giftAidSignatureName(firstName, lastName) {
+  const initial = String(firstName || "").trim().charAt(0).toUpperCase(),
+    surname = String(lastName || "").trim();
+  return initial && surname ? `${initial}. ${surname}` : "—";
+}
 function bindGiftAidFields() {
   const form = $("#updateForm"), residence = form?.elements.namedItem("countryOfResidence");
   if (!form || state.journeyType === "visitor" || $("#giftAidSection")) return;
   const grid = form.querySelector(".form-grid");
   if (!grid) return;
-  grid.insertAdjacentHTML("beforeend", `<section class="gift-aid-section" id="giftAidSection" hidden><div class="gift-aid-intro"><b>Gift Aid <em>New</em></b><p>If you pay UK tax, Gift Aid lets the church claim 25p from HMRC for every £1 you give, at no extra cost to you. Optional.</p></div><div class="field"><label>Do you consent to take part in Gift Aid?</label><select name="giftAidChoice"><option value="">Choose one</option><option value="yes">Yes, I’m a UK taxpayer</option><option value="already">I’ve already made a Gift Aid declaration</option><option value="no">No, thank you</option></select></div><div class="gift-aid-declaration" id="giftAidDeclaration" hidden><h4>Your Gift Aid declaration</h4><p>We’ve filled this in from your answers. Check it, tick both boxes and type your name to sign.</p><dl><div><dt>Full name</dt><dd data-gift-name></dd></div><div><dt>Home address</dt><dd data-gift-address></dd></div><div><dt>Phone number</dt><dd data-gift-phone></dd></div><div><dt>Date of declaration</dt><dd>Filled securely when submitted</dd></div></dl><p class="gift-aid-summary">Please treat as Gift Aid donations all qualifying gifts of money I make today, in the past 4 years and in the future to The Liberty Church.</p><label class="gift-aid-check"><input type="checkbox" name="giftAidDonorDeclaration" value="yes"><span><b>Donor’s declaration</b>${GIFT_AID_DONOR_WORDING}</span></label><label class="gift-aid-check"><input type="checkbox" name="giftAidPrivacyConsent" value="yes"><span><b>Privacy consent</b>${GIFT_AID_PRIVACY_WORDING}</span></label><div class="field"><label>Type your full name to sign</label><input name="giftAidSignature" autocomplete="name"><p class="hint">Your typed name is your electronic signature.</p></div><details><summary>Please tell us if you need to</summary><p>Cancel this declaration, change your name or home address, or tell us you no longer pay enough tax on your income and/or capital gains. Email accounts@thelibertychurchlondon.com. If you pay tax at the higher or additional rate, include your Gift Aid donations on your Self Assessment tax return or ask HMRC to adjust your tax code. The Liberty Church, registered charity 1169864.</p></details></div></section>`);
-  const section = $("#giftAidSection"), choice = form.elements.namedItem("giftAidChoice"), declaration = $("#giftAidDeclaration"), postcode = form.elements.namedItem("postcode"), signature = form.elements.namedItem("giftAidSignature"), donor = form.elements.namedItem("giftAidDonorDeclaration"), privacy = form.elements.namedItem("giftAidPrivacyConsent");
+  grid.insertAdjacentHTML("beforeend", `<section class="gift-aid-section" id="giftAidSection" hidden><div class="gift-aid-intro"><b>Gift Aid <em>New</em></b><p>If you pay UK tax, Gift Aid lets the church claim 25p from HMRC for every £1 you give, at no extra cost to you. Optional.</p></div><div class="field"><label>Do you consent to take part in Gift Aid?</label><select name="giftAidChoice"><option value="">Choose one</option><option value="yes">Yes, I’m a UK taxpayer</option><option value="already">I’ve already made a Gift Aid declaration</option><option value="no">No, thank you</option></select></div><div class="gift-aid-declaration" id="giftAidDeclaration" hidden><h4>Your Gift Aid declaration</h4><p>We’ve filled this in from your answers. Check it and tick all three boxes to confirm.</p><dl><div><dt>Full name</dt><dd data-gift-name></dd></div><div><dt>Home address</dt><dd data-gift-address></dd></div><div><dt>Phone number</dt><dd data-gift-phone></dd></div><div><dt>Date of declaration</dt><dd>Filled securely when submitted</dd></div></dl><p class="gift-aid-summary">Please treat as Gift Aid donations all donations I make today, in the past four years and in the future to The Liberty Church.</p><label class="gift-aid-check"><input type="checkbox" name="giftAidDonorDeclaration" value="yes"><span><b>Donor’s declaration</b>${GIFT_AID_DONOR_WORDING}</span></label><label class="gift-aid-check"><input type="checkbox" name="giftAidPrivacyConsent" value="yes"><span><b>Privacy consent</b>${GIFT_AID_PRIVACY_WORDING}</span></label><div class="gift-aid-signature"><span>Electronic signature</span><strong data-gift-signature>—</strong></div><label class="gift-aid-check"><input type="checkbox" name="giftAidSignatureConsent" value="yes"><span><b>I agree to this as my electronic signature.</b></span></label><details><summary>Please tell us if you need to</summary><p>Cancel this declaration, change your name or home address, or tell us you no longer pay enough tax on your income and/or capital gains. Email accounts@thelibertychurchlondon.com. If you pay tax at the higher or additional rate, include your Gift Aid donations on your Self Assessment tax return or ask HMRC to adjust your tax code. The Liberty Church, registered charity 1169864.</p></details></div></section>`);
+  const section = $("#giftAidSection"), choice = form.elements.namedItem("giftAidChoice"), declaration = $("#giftAidDeclaration"), postcode = form.elements.namedItem("postcode"), signatureConsent = form.elements.namedItem("giftAidSignatureConsent"), donor = form.elements.namedItem("giftAidDonorDeclaration"), privacy = form.elements.namedItem("giftAidPrivacyConsent");
   choice.id = "giftAidChoice";
   choice.closest(".field")?.querySelector("label")?.setAttribute("for", "giftAidChoice");
   if (state.formDraft.giftAidChoice) choice.value = state.formDraft.giftAidChoice;
-  if (state.formDraft.giftAidSignature) signature.value = state.formDraft.giftAidSignature;
   donor.checked = state.formDraft.giftAidDonorDeclaration === "yes";
   privacy.checked = state.formDraft.giftAidPrivacyConsent === "yes";
+  signatureConsent.checked = state.formDraft.giftAidSignatureConsent === "yes";
   const refresh = () => {
     const uk = ["GB", "United Kingdom"].includes(String(residence?.value || ""));
     section.hidden = !uk;
     if (!uk) choice.value = "";
     const yes = uk && choice.value === "yes";
     declaration.hidden = !yes;
-    [signature, donor, privacy].forEach((field) => { if (field) field.required = yes; });
+    [signatureConsent, donor, privacy].forEach((field) => { if (field) field.required = yes; });
     if (postcode) postcode.required = yes;
     section.querySelector("[data-gift-name]").textContent = `${form.elements.namedItem("firstName")?.value || ""} ${form.elements.namedItem("lastName")?.value || ""}`.trim() || "—";
     section.querySelector("[data-gift-address]").textContent = [form.elements.namedItem("addressLine1")?.value, postcode?.value].filter(Boolean).join(", ") || "—";
     section.querySelector("[data-gift-phone]").textContent = form.elements.namedItem("phone")?.value || "—";
+    section.querySelector("[data-gift-signature]").textContent = giftAidSignatureName(form.elements.namedItem("firstName")?.value, form.elements.namedItem("lastName")?.value);
   };
   residence?.addEventListener("change", refresh);
   choice?.addEventListener("change", refresh);

@@ -169,6 +169,15 @@ test("Gift Aid appears for a UK attendee", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("#giftAidSection")).not.toHaveAttribute("hidden", "");
   await expect(page.locator('select[name="giftAidChoice"]')).toContainText("Yes, I’m a UK taxpayer");
+  await expect(page.locator('select[name="giftAidChoice"] option')).toHaveCount(4);
+  await page.locator('select[name="giftAidChoice"]').evaluate((select) => {
+    select.value = "yes";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.locator("[data-gift-signature]")).toHaveText("A. Regression");
+  await expect(page.locator('input[name="giftAidSignature"]')).toHaveCount(0);
+  await expect(page.locator('input[name="giftAidSignatureConsent"]')).toHaveCount(1);
+  await expect(page.locator(".gift-aid-summary")).toContainText("all donations I make today, in the past four years");
   const sectionOrder = await page.locator('[data-profile-panel="3"] .wizard-fields').evaluate((panel) =>
     [...panel.children].map((child) => child.id || child.className),
   );
